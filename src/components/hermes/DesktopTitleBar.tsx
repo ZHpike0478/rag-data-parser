@@ -1,15 +1,16 @@
 import React from 'react';
-import { 
-  Terminal, 
-  Cpu, 
-  ShieldCheck, 
-  Settings, 
-  Download, 
+import {
+  Terminal,
+  Cpu,
+  ShieldCheck,
+  Settings,
+  Download,
   Sparkles,
   Layers,
   ChevronDown,
   Activity,
-  HardDrive
+  HardDrive,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
