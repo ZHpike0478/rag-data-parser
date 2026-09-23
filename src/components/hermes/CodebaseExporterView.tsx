@@ -66,7 +66,7 @@ export const CodebaseExporterView: React.FC = () => {
               Native C++ & Rust Source Codebase
             </h2>
             <Badge variant="outline" className="text-[10px] font-mono border-cyan-800 bg-cyan-950/40 text-cyan-300">
-              10 Compile-Ready Files
+              {NATIVE_PROJECT_FILES.length} Compile-Ready Files
             </Badge>
           </div>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">

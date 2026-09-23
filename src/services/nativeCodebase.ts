@@ -60,6 +60,32 @@ panic = "abort"
 `
   },
   {
+    path: 'build.rs',
+    filename: 'build.rs',
+    language: 'rust',
+    description: 'Rust build script using cxx_build to compile and link the C++20 engine with Cargo',
+    content: `fn main() {
+    // Compile C++20 inference engine and bridge with Rust
+    cxx_build::bridge("src/bridge/ffi.rs")
+        .file("src-cpp/inference_engine.cpp")
+        .file("src-cpp/simd_tokenizer.cpp")
+        .file("src-cpp/kv_cache_manager.cpp")
+        .include("include")
+        .flag_if_supported("-std=c++20")
+        .flag_if_supported("-O3")
+        .flag_if_supported("-march=native")
+        .flag_if_supported("/std:c++20") // MSVC
+        .compile("zeus_cpp_engine");
+
+    println!("cargo:rerun-if-changed=src/bridge/ffi.rs");
+    println!("cargo:rerun-if-changed=include/zeus/bridge.hpp");
+    println!("cargo:rerun-if-changed=src-cpp/inference_engine.cpp");
+    println!("cargo:rerun-if-changed=src-cpp/simd_tokenizer.cpp");
+    println!("cargo:rerun-if-changed=src-cpp/kv_cache_manager.cpp");
+}
+`
+  },
+  {
     path: 'CMakeLists.txt',
     filename: 'CMakeLists.txt',
     language: 'cmake',
@@ -321,6 +347,115 @@ std::unique_ptr<NativeLlamaEngine> create_native_engine() {
 }
 
 } // namespace bridge
+} // namespace zeus
+`
+  },
+  {
+    path: 'src-cpp/simd_tokenizer.cpp',
+    filename: 'simd_tokenizer.cpp',
+    language: 'cpp',
+    description: 'AVX2 and NEON SIMD accelerated byte-pair encoding (BPE) tokenizer pipeline',
+    content: `#include <string>
+#include <vector>
+#include <cstdint>
+#include <cstring>
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#endif
+
+namespace zeus {
+namespace tokenizer {
+
+// Fast SIMD vectorized whitespace & delimiter scanner
+size_t fast_token_boundary_scan(const char* data, size_t length) {
+    size_t count = 0;
+    size_t i = 0;
+
+#if defined(__AVX2__)
+    __m256i space_char = _mm256_set1_epi8(' ');
+    __m256i newline_char = _mm256_set1_epi8('\\n');
+
+    for (; i + 32 <= length; i += 32) {
+        __m256i chunk = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(data + i));
+        __m256i match_space = _mm256_cmpeq_epi8(chunk, space_char);
+        __m256i match_nl = _mm256_cmpeq_epi8(chunk, newline_char);
+        __m256i combined = _mm256_or_si256(match_space, match_nl);
+        uint32_t mask = _mm256_movemask_epi8(combined);
+        count += __builtin_popcount(mask);
+    }
+#endif
+
+    // Process remaining scalar tail
+    for (; i < length; ++i) {
+        if (data[i] == ' ' || data[i] == '\\n' || data[i] == '\\t') {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+} // namespace tokenizer
+} // namespace zeus
+`
+  },
+  {
+    path: 'src-cpp/kv_cache_manager.cpp',
+    filename: 'kv_cache_manager.cpp',
+    language: 'cpp',
+    description: 'Thread-safe paged ring-buffer KV cache manager for long context transformer inference',
+    content: `#include <vector>
+#include <atomic>
+#include <cstring>
+#include <cstdint>
+#include <mutex>
+
+namespace zeus {
+namespace kv {
+
+constexpr size_t DEFAULT_EMBEDDING_DIM = 4096;
+constexpr size_t MAX_CACHE_PAGES = 32768;
+
+class PagedKvCache {
+public:
+    PagedKvCache(size_t dim = DEFAULT_EMBEDDING_DIM)
+        : embed_dim_(dim), head_pos_(0), total_allocated_bytes_(0) {
+        cache_buffer_.resize(MAX_CACHE_PAGES * embed_dim_, 0.0f);
+        total_allocated_bytes_ = cache_buffer_.size() * sizeof(float);
+    }
+
+    // Atomic insertion into ring buffer with bounds guard
+    bool append_token_embedding(const float* embedding, size_t dim) {
+        if (dim != embed_dim_ || embedding == nullptr) {
+            return false;
+        }
+
+        size_t slot = head_pos_.fetch_add(1, std::memory_order_acq_rel) % MAX_CACHE_PAGES;
+        std::memcpy(&cache_buffer_[slot * embed_dim_], embedding, embed_dim_ * sizeof(float));
+        return true;
+    }
+
+    void reset() {
+        head_pos_.store(0, std::memory_order_release);
+    }
+
+    size_t get_active_slots() const {
+        return head_pos_.load(std::memory_order_relaxed);
+    }
+
+    size_t get_allocated_bytes() const {
+        return total_allocated_bytes_;
+    }
+
+private:
+    size_t embed_dim_;
+    std::atomic<size_t> head_pos_;
+    std::vector<float> cache_buffer_;
+    size_t total_allocated_bytes_;
+};
+
+} // namespace kv
 } // namespace zeus
 `
   },
@@ -666,6 +801,51 @@ cargo build --release
 echo ""
 echo "=== Build Complete! Executable located at: ./target/release/zeus-desktop ==="
 echo "Run with: ./target/release/zeus-desktop"
+`
+  },
+  {
+    path: 'Makefile',
+    filename: 'Makefile',
+    language: 'bash',
+    description: 'Universal Makefile for building, testing, and running Zeus Desktop across platforms',
+    content: `.PHONY: all build clean run test
+
+all: build
+
+build:
+	@echo "--> Compiling Zeus C++ Core and Rust Supervisor..."
+	cargo build --release
+
+run: build
+	@echo "--> Launching Zeus Desktop Native Workstation..."
+	./target/release/zeus-desktop
+
+test:
+	@echo "--> Running Rust test suite and CXX boundary tests..."
+	cargo test --workspace
+
+clean:
+	@echo "--> Cleaning build artifacts..."
+	cargo clean
+	rm -rf build-cpp target
+`
+  },
+  {
+    path: '.gitignore',
+    filename: '.gitignore',
+    language: 'markdown',
+    description: 'Git ignore rules for Rust target, CMake build directories, and GGUF model files',
+    content: `target/
+build-cpp/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.gguf
+*.bin
+workspace/
+.DS_Store
 `
   },
   {

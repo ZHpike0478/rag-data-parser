@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { HermesSkill } from '@/types/hermes';
+import { RealAgentService } from '@/services/realAgentService';
 import { toast } from 'sonner';
 
 interface SkillsManagerViewProps {
@@ -60,36 +61,40 @@ export const SkillsManagerView: React.FC<SkillsManagerViewProps> = ({
     } else if (skill.id === 'skill-file') {
       setTestParamInput('{"action": "list", "path": "./src"}');
     } else if (skill.id === 'skill-cxx') {
-      setTestParamInput('printf("Zero-overhead C++ SIMD check: %d\\n", __AVX2__);');
+      setTestParamInput('Math.hypot(3, 4) * Math.SQRT2 + Math.PI');
+    } else if (skill.id === 'skill-web') {
+      setTestParamInput('https://en.wikipedia.org/api/rest_v1/page/summary/Rust_(programming_language)');
     } else {
       setTestParamInput('query: "Zeus architecture documentation"');
     }
   };
 
-  const handleExecuteTest = () => {
+  const handleExecuteTest = async () => {
     if (!testingSkill) return;
     setIsRunningTest(true);
     setTestOutput(null);
 
-    setTimeout(() => {
-      setIsRunningTest(false);
-      if (testingSkill.implementedIn === 'Rust') {
-        setTestOutput(`[Rust Tokio Sandbox Dispatch]
-Spawned isolated thread with cgroups limit: 512MB
-Command: ${testParamInput}
-STDOUT:
-Linux zeus-desktop 6.5.0-x86_64 #1 SMP PREEMPT_DYNAMIC
-cargo 1.78.0 (2c72b83 2024-05-02)
-Status: Completed with exit code 0 (execution: 14ms)`);
-      } else {
-        setTestOutput(`[C++ Native JIT Kernel]
-Compiled via GCC 13 with -O3 -mavx2:
-Zero-overhead C++ SIMD check: 1
-AVX2 Vector Registers active.
-Status: Success (execution: 3ms)`);
+    try {
+      let args: Record<string, any> = {};
+      try {
+        if (testParamInput.trim().startsWith('{')) {
+          args = JSON.parse(testParamInput);
+        } else {
+          args = { command: testParamInput, query: testParamInput, code: testParamInput, url: testParamInput };
+        }
+      } catch {
+        args = { input: testParamInput };
       }
-      toast.success(`Executed ${testingSkill.name} in sandbox`);
-    }, 700);
+
+      const res = await RealAgentService.executeRealTool(testingSkill.name, args);
+      setIsRunningTest(false);
+      setTestOutput(`${res.output}\n\n[Execution Metric: ${res.executionTimeMs}ms • Status: ${res.status.toUpperCase()}]`);
+      toast.success(`Executed ${testingSkill.name} with real runtime data`);
+    } catch (err: any) {
+      setIsRunningTest(false);
+      setTestOutput(`Error executing tool: ${err.message}`);
+      toast.error('Execution failed');
+    }
   };
 
   const handleCreateSkill = (e: React.FormEvent) => {

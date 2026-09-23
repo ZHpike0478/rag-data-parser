@@ -1,23 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Send, 
-  Terminal, 
-  Sparkles, 
-  ChevronRight, 
-  ChevronDown, 
-  CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  Copy, 
-  Check, 
-  Shield, 
-  Cpu, 
-  Play, 
+import {
+  Send,
+  Terminal,
+  Sparkles,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Copy,
+  Check,
+  Shield,
+  Cpu,
+  Play,
   RotateCcw,
   Zap,
   Code2,
   FolderTree,
-  Search
+  Search,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +81,31 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleExportTranscript = () => {
+    if (messages.length === 0) {
+      toast.info('No messages to export');
+      return;
+    }
+    const transcript = messages.map(m => {
+      const header = `### [${m.timestamp}] ${m.role.toUpperCase()}:`;
+      const tools = m.toolCalls && m.toolCalls.length > 0
+        ? `\nTools Executed:\n${m.toolCalls.map(t => `- ${t.name}: ${JSON.stringify(t.arguments)} -> ${t.result}`).join('\n')}\n`
+        : '';
+      return `${header}\n${m.thought ? `<scratchpad>\n${m.thought}\n</scratchpad>\n` : ''}${tools}${m.content}\n`;
+    }).join('\n---\n\n');
+
+    const blob = new Blob([transcript], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zeus_session_${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Session transcript exported as Markdown');
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-950/40 relative">
       {/* Top Banner / Context Bar */}
@@ -96,7 +122,18 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
           <span className="text-emerald-400/90 font-mono">Tokio Sandboxed PID #8192</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExportTranscript}
+            className="h-6 px-2 text-[11px] text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            title="Export session conversation as Markdown"
+          >
+            <Download className="w-3 h-3 mr-1" />
+            Export Log
+          </Button>
+
           <Button
             variant="ghost"
             size="sm"

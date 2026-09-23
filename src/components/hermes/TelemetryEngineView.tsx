@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { EngineTelemetry, HermesModelConfig } from '@/types/hermes';
+import { measureFfiLatency } from '@/services/realSystemService';
 import { toast } from 'sonner';
 
 interface TelemetryEngineViewProps {
@@ -37,10 +38,11 @@ export const TelemetryEngineView: React.FC<TelemetryEngineViewProps> = ({
   const handleRunFfiProbe = () => {
     setIsProbing(true);
     setTimeout(() => {
+      const realLatencyUs = measureFfiLatency();
       setIsProbing(false);
       onRefreshTelemetry();
-      toast.success('CXX Bridge Latency Benchmark: 17.8 µs (Roundtrip verified)');
-    }, 600);
+      toast.success(`Real CXX FFI Benchmark: ${realLatencyUs} µs (Direct Typed Array Buffer Pass)`);
+    }, 400);
   };
 
   const handleFlushKvCache = () => {

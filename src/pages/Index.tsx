@@ -11,7 +11,8 @@ import {
   Cpu,
   RefreshCw,
   ExternalLink,
-  Code2
+  Code2,
+  Server
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -27,22 +28,30 @@ import {
   DEFAULT_MODELS, 
   DEFAULT_SKILLS, 
   INITIAL_CONVERSATION, 
-  generateTelemetry, 
-  simulateHermesAgentResponse 
+  generateTelemetry 
 } from '@/services/hermesAgentSimulator';
 import { downloadProjectZip } from '@/services/nativeCodebase';
 import { AgentMessage, EngineTelemetry, HermesModelConfig, HermesSkill } from '@/types/hermes';
+import { SessionStore, ChatSession, BackendEndpointConfig } from '@/services/sessionStore';
+import { RealAgentService } from '@/services/realAgentService';
+import { detectRealSystemInfo } from '@/services/realSystemService';
 import { toast } from 'sonner';
 
 const Index: React.FC = () => {
   // Navigation
   const [activeTab, setActiveTab] = useState<string>('chat');
 
+  // Persistent session state
+  const [sessions, setSessions] = useState<ChatSession[]>(() => SessionStore.getSessions());
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => SessionStore.getActiveSessionId());
+  
+  // Endpoint config
+  const [endpointConfig, setEndpointConfig] = useState<BackendEndpointConfig>(() => SessionStore.getEndpointConfig());
+
   // Models & State
-  const [models, setModels] = useState<HermesModelConfig[]>(DEFAULT_MODELS);
-  const [currentModel, setCurrentModel] = useState<HermesModelConfig>(DEFAULT_MODELS[0]);
-  const [skills, setSkills] = useState<HermesSkill[]>(DEFAULT_SKILLS);
-  const [messages, setMessages] = useState<AgentMessage[]>(INITIAL_CONVERSATION);
+  const [models, setModels] = useState<HermesModelConfig[]>(() => SessionStore.getModels());
+  const [currentModel, setCurrentModel] = useState<HermesModelConfig>(() => models[0] || DEFAULT_MODELS[0]);
+  const [skills, setSkills] = useState<HermesSkill[]>(() => SessionStore.getSkills());
   const [telemetry, setTelemetry] = useState<EngineTelemetry>(generateTelemetry());
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
@@ -50,16 +59,52 @@ const Index: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [osStyle, setOsStyle] = useState<'macos' | 'linux' | 'windows'>('macos');
 
+  // Active session messages
+  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
+  const messages = activeSession ? activeSession.messages : [];
+
+  // Update telemetry with real host hardware upon mount
+  useEffect(() => {
+    detectRealSystemInfo().then((realSys) => {
+      setTelemetry(prev => ({
+        ...prev,
+        rust: {
+          ...prev.rust,
+          tokioWorkers: realSys.cpuCores,
+          memoryMb: realSys.heapMemoryUsedMb,
+        },
+        cpp: {
+          ...prev.cpp,
+          activeKernels: `${realSys.gpuRenderer} (Offloaded)`,
+        }
+      }));
+    });
+  }, []);
+
   // Periodic simulated telemetry heartbeat
   useEffect(() => {
     const interval = setInterval(() => {
       setTelemetry(generateTelemetry());
-    }, 4000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Handle user dispatching a message to Zeus
-  const handleSendMessage = useCallback((text: string) => {
+  // Save sessions to storage whenever they change
+  const updateMessages = (newMessages: AgentMessage[]) => {
+    setSessions(prev => {
+      const next = prev.map(s => {
+        if (s.id === activeSessionId) {
+          return { ...s, messages: newMessages, updatedAt: new Date().toLocaleTimeString() };
+        }
+        return s;
+      });
+      SessionStore.saveSessions(next);
+      return next;
+    });
+  };
+
+  // Handle user dispatching a message to Zeus with real data & tool execution
+  const handleSendMessage = useCallback(async (text: string) => {
     const userMsg: AgentMessage = {
       id: 'msg-' + Date.now(),
       role: 'user',
@@ -67,33 +112,48 @@ const Index: React.FC = () => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    const updatedWithUser = [...messages, userMsg];
+    updateMessages(updatedWithUser);
     setIsGenerating(true);
 
-    // Simulate C++ inference streaming and Rust sandbox dispatch
-    setTimeout(() => {
-      const assistantMsg = simulateHermesAgentResponse(text, currentModel);
-      setMessages(prev => [...prev, assistantMsg]);
-      setIsGenerating(false);
+    try {
+      // Execute real agent turn with live tools (web, github, math, system)
+      const assistantMsg = await RealAgentService.runAgentTurn(text, currentModel, endpointConfig);
+      updateMessages([...updatedWithUser, assistantMsg]);
       setTelemetry(generateTelemetry());
-    }, 1200);
-  }, [currentModel]);
+    } catch (err: any) {
+      toast.error('Error generating response: ' + err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [messages, currentModel, endpointConfig]);
 
   const handleClearChat = () => {
-    setMessages([]);
+    updateMessages([]);
     toast.info('Zeus workspace session reset');
   };
 
   const handleToggleSkill = (skillId: string) => {
-    setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled: !s.enabled } : s));
+    setSkills(prev => {
+      const next = prev.map(s => s.id === skillId ? { ...s, enabled: !s.enabled } : s);
+      SessionStore.saveSkills(next);
+      return next;
+    });
   };
 
   const handleAddSkill = (newSkill: HermesSkill) => {
-    setSkills(prev => [...prev, newSkill]);
+    setSkills(prev => {
+      const next = [...prev, newSkill];
+      SessionStore.saveSkills(next);
+      return next;
+    });
   };
 
   const handleUpdateModelConfig = (updated: Partial<HermesModelConfig>) => {
-    setCurrentModel(prev => ({ ...prev, ...updated }));
+    setCurrentModel(prev => {
+      const next = { ...prev, ...updated };
+      return next;
+    });
   };
 
   const handleExportZip = async () => {
@@ -166,13 +226,13 @@ const Index: React.FC = () => {
               {/* Status pill on right */}
               <div className="hidden xl:flex items-center gap-2 text-xs font-mono text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  Rust Memory Safety Guaranteed
+                  <Server className="w-3.5 h-3.5 text-cyan-400" />
+                  Provider: {endpointConfig.mode}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-                  Zero-Copy CXX Bridge Active
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  Rust Tokio Sandbox
                 </span>
               </div>
             </div>
@@ -219,6 +279,8 @@ const Index: React.FC = () => {
         onOpenChange={setIsSettingsOpen}
         currentModel={currentModel}
         onUpdateModelConfig={handleUpdateModelConfig}
+        endpointConfig={endpointConfig}
+        onUpdateEndpointConfig={setEndpointConfig}
       />
 
       {/* Floating Made with Dyad Badge */}

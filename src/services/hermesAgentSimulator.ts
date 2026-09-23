@@ -178,6 +178,16 @@ Native binary verified. 0 warnings, 0 lifetime leaks.`,
 
 export const PRESET_SCENARIOS = [
   {
+    title: 'Live GitHub API Inspection',
+    prompt: 'Inspect nousresearch/hermes-agent repository on GitHub for live stars, issues, and commits.',
+    badge: 'Live Network',
+  },
+  {
+    title: 'Live Wikipedia Web Extraction',
+    prompt: 'Fetch live Wikipedia documentation for the Rust programming language and summarize safety invariants.',
+    badge: 'Real Fetch',
+  },
+  {
     title: 'C++ SIMD Tokenizer Benchmark',
     prompt: 'Benchmark the C++ AVX2 SIMD tokenizer against scalar string parsing and report throughput.',
     badge: 'C++ / AVX-512',
