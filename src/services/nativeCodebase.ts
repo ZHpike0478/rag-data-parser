@@ -442,7 +442,7 @@ impl HermesAgentLoop {
         }
     }
 
-    /// Parses Hermes 3 style `<tool_call>` JSON payload from output stream
+    /// Parses Hermes 3 style <tool_call> JSON payload from output stream
     pub fn extract_tool_calls(&self, response: &str) -> Vec<ToolCallRequest> {
         let mut calls = Vec::new();
         let re = regex::Regex::new(r"(?s)<tool_call>\s*(\{.*?\})\s*</tool_call>").unwrap();
@@ -459,7 +459,7 @@ impl HermesAgentLoop {
         calls
     }
 
-    /// Extracts inner thought process enclosed in `<scratchpad>` or `<thought>`
+    /// Extracts inner thought process enclosed in <scratchpad> or <thought>
     pub fn extract_thought(&self, response: &str) -> Option<String> {
         let re = regex::Regex::new(r"(?s)<scratchpad>(.*?)</scratchpad>").unwrap();
         re.captures(response).map(|c| c.get(1).unwrap().as_str().trim().to_string())
