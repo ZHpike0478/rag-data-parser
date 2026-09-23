@@ -1,487 +1,230 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Play, 
-  Settings, 
   Terminal, 
-  Code, 
-  CheckCircle2, 
-  Sliders, 
-  FileText, 
-  Cpu, 
-  Layers, 
-  Zap, 
-  Server, 
-  BookOpen, 
-  Radio, 
-  ExternalLink,
+  Activity, 
+  Wrench, 
+  FolderTree, 
+  Sparkles,
+  Download,
+  Settings as SettingsIcon,
   ShieldCheck,
+  Cpu,
   RefreshCw,
-  Pause
+  ExternalLink,
+  Code2
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Header } from '@/components/Header';
-import { TelemetryOverview } from '@/components/TelemetryOverview';
-import { ScenarioRunner } from '@/components/ScenarioRunner';
-import { RouterPlayground } from '@/components/RouterPlayground';
-import { ConsoleLogStreamer } from '@/components/ConsoleLogStreamer';
-import { SettingsModal } from '@/components/SettingsModal';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { DesktopTitleBar } from '@/components/hermes/DesktopTitleBar';
+import { AgentChatView } from '@/components/hermes/AgentChatView';
+import { TelemetryEngineView } from '@/components/hermes/TelemetryEngineView';
+import { SkillsManagerView } from '@/components/hermes/SkillsManagerView';
+import { CodebaseExporterView } from '@/components/hermes/CodebaseExporterView';
+import { SettingsDialog } from '@/components/hermes/SettingsDialog';
 import { MadeWithDyad } from '@/components/made-with-dyad';
-import { DEFAULT_CONFIG, INITIAL_SCENARIOS, AVAILABLE_ROUTES } from '@/services/harnessData';
-import { HarnessEngine } from '@/services/harnessEngine';
-import { Scenario, HarnessConfig, RoutingStrategy, LogEntry } from '@/types/harness';
+import { 
+  DEFAULT_MODELS, 
+  DEFAULT_SKILLS, 
+  INITIAL_CONVERSATION, 
+  generateTelemetry, 
+  simulateHermesAgentResponse 
+} from '@/services/hermesAgentSimulator';
+import { downloadProjectZip } from '@/services/nativeCodebase';
+import { AgentMessage, EngineTelemetry, HermesModelConfig, HermesSkill } from '@/types/hermes';
 import { toast } from 'sonner';
 
-const SAMPLE_LIVE_QUERIES = [
-  { prompt: 'Evaluate mathematical theorem AST #304', route: 'Claude 3.5 Sonnet (v2)', latency: 340, tokens: 290 },
-  { prompt: 'Vector semantic retrieval: customer ticket #8812', route: 'GPT-4o Omni (2024-11)', latency: 275, tokens: 195 },
-  { prompt: 'Extract 12 financial line items from SEC 10-K disclosure', route: 'DeepSeek-V3 MoE', latency: 310, tokens: 412 },
-  { prompt: 'Fast edge classification: session #099a SLA check', route: 'Local vLLM / Qwen 2.5 Coder', latency: 104, tokens: 68 },
-  { prompt: 'Inference gateway health pulse check & heartbeat', route: 'Llama 3.3 70B Instruct', latency: 198, tokens: 110 },
-  { prompt: 'Red-team prompt injection guardrail probe: verify policy refusal', route: 'Claude 3.5 Sonnet (v2)', latency: 220, tokens: 94 },
-];
-
 const Index: React.FC = () => {
-  // Config state
-  const [config, setConfig] = useState<HarnessConfig>(DEFAULT_CONFIG);
-  const [scenarios, setScenarios] = useState<Scenario[]>(INITIAL_SCENARIOS);
-  const [activeTab, setActiveTab] = useState<string>('scenarios');
+  // Navigation
+  const [activeTab, setActiveTab] = useState<string>('chat');
 
-  // Active daemon state
-  const [daemonActive, setDaemonActive] = useState<boolean>(true);
-  const [liveRps, setLiveRps] = useState<number>(24.8);
-  const [totalTokensProcessed, setTotalTokensProcessed] = useState<number>(148290);
+  // Models & State
+  const [models, setModels] = useState<HermesModelConfig[]>(DEFAULT_MODELS);
+  const [currentModel, setCurrentModel] = useState<HermesModelConfig>(DEFAULT_MODELS[0]);
+  const [skills, setSkills] = useState<HermesSkill[]>(DEFAULT_SKILLS);
+  const [messages, setMessages] = useState<AgentMessage[]>(INITIAL_CONVERSATION);
+  const [telemetry, setTelemetry] = useState<EngineTelemetry>(generateTelemetry());
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Logs state
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  // Settings & OS styling
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [osStyle, setOsStyle] = useState<'macos' | 'linux' | 'windows'>('macos');
 
-  // Engine instance
-  const engine = useMemo(() => {
-    return new HarnessEngine(DEFAULT_CONFIG);
+  // Periodic simulated telemetry heartbeat
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTelemetry(generateTelemetry());
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Execution states
-  const [runningId, setRunningId] = useState<string | null>(null);
-  const [isRunningAll, setIsRunningAll] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [backendHealthy, setBackendHealthy] = useState(true);
-  const [isPinging, setIsPinging] = useState(false);
+  // Handle user dispatching a message to Hermes
+  const handleSendMessage = useCallback((text: string) => {
+    const userMsg: AgentMessage = {
+      id: 'msg-' + Date.now(),
+      role: 'user',
+      content: text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    };
 
-  // Subscribe to engine logs
-  useEffect(() => {
-    // Initial welcome logs
-    engine.addLog('INFO', 'SYSTEM', 'SystemOne Harness Daemon started. Real-time traffic stream ACTIVE.');
-    engine.addLog('INFO', 'ROUTER', 'Dynamic routing arbitration engine primed across 5 target model nodes.');
-    engine.addLog('INFO', 'HARNESS', `All ${INITIAL_SCENARIOS.length} benchmark test suites verified (100% pass rate).`);
-    setLogs([...engine.getLogs()]);
+    setMessages(prev => [...prev, userMsg]);
+    setIsGenerating(true);
 
-    const unsubscribe = engine.subscribeLogs((newLog) => {
-      setLogs((prev) => [newLog, ...prev.slice(0, 499)]);
-    });
+    // Simulate C++ inference streaming and Rust sandbox dispatch
+    setTimeout(() => {
+      const assistantMsg = simulateHermesAgentResponse(text, currentModel);
+      setMessages(prev => [...prev, assistantMsg]);
+      setIsGenerating(false);
+      setTelemetry(generateTelemetry());
+    }, 1200);
+  }, [currentModel]);
 
-    return () => unsubscribe();
-  }, [engine]);
-
-  // Live traffic daemon interval
-  useEffect(() => {
-    if (!daemonActive) return;
-
-    const interval = setInterval(() => {
-      // Pick random simulated live query
-      const sample = SAMPLE_LIVE_QUERIES[Math.floor(Math.random() * SAMPLE_LIVE_QUERIES.length)];
-      const jitter = Math.floor(Math.random() * 30 - 15);
-      const actualLatency = Math.max(sample.latency + jitter, 80);
-
-      // Increment tokens & slightly jitter RPS
-      setTotalTokensProcessed(prev => prev + sample.tokens);
-      setLiveRps(prev => +(Math.max(16, Math.min(38, prev + (Math.random() * 2.4 - 1.2)))).toFixed(1));
-
-      // Emit log entry
-      engine.addLog(
-        'ROUTE', 
-        'DAEMON', 
-        `Routed "${sample.prompt.slice(0, 42)}..." -> [${sample.route}] (${actualLatency}ms, ${sample.tokens} tok)`
-      );
-    }, 3800);
-
-    return () => clearInterval(interval);
-  }, [daemonActive, engine]);
-
-  // Ping backend
-  const handlePing = useCallback(async () => {
-    setIsPinging(true);
-    const result = await engine.pingBackend();
-    setBackendHealthy(result.success);
-    setIsPinging(false);
-    if (result.success) {
-      toast.success(result.message);
-    } else {
-      toast.warning(result.message);
-    }
-  }, [engine]);
-
-  // Toggle daemon
-  const handleToggleDaemon = () => {
-    const nextState = !daemonActive;
-    setDaemonActive(nextState);
-    if (nextState) {
-      engine.addLog('INFO', 'DAEMON', 'Live background traffic daemon RESUMED.');
-      toast.success('Live Daemon Active: background traffic & telemetry streaming');
-    } else {
-      engine.addLog('WARN', 'DAEMON', 'Live background traffic daemon PAUSED by operator.');
-      toast.info('Live Daemon Paused');
-    }
+  const handleClearChat = () => {
+    setMessages([]);
+    toast.info('Hermes workspace session reset');
   };
 
-  // Run a single scenario
-  const handleRunScenario = async (scenario: Scenario) => {
-    setRunningId(scenario.id);
-    setScenarios((prev) =>
-      prev.map((s) => (s.id === scenario.id ? { ...s, status: 'running' } : s))
-    );
+  const handleToggleSkill = (skillId: string) => {
+    setSkills(prev => prev.map(s => s.id === skillId ? { ...s, enabled: !s.enabled } : s));
+  };
 
+  const handleAddSkill = (newSkill: HermesSkill) => {
+    setSkills(prev => [...prev, newSkill]);
+  };
+
+  const handleUpdateModelConfig = (updated: Partial<HermesModelConfig>) => {
+    setCurrentModel(prev => ({ ...prev, ...updated }));
+  };
+
+  const handleExportZip = async () => {
     try {
-      const result = await engine.runScenario(scenario);
-      setScenarios((prev) =>
-        prev.map((s) =>
-          s.id === scenario.id
-            ? {
-                ...s,
-                status: result.allPassed ? 'passed' : 'failed',
-                lastResult: result,
-              }
-            : s
-        )
-      );
-      if (result.allPassed) {
-        toast.success(`Scenario [${scenario.id}] Passed (${result.durationMs}ms)`);
-      } else {
-        toast.error(`Scenario [${scenario.id}] Failed assertion requirements`);
-      }
-    } catch (err: unknown) {
-      console.error(err);
-      toast.error(`Scenario execution failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setRunningId(null);
+      await downloadProjectZip();
+      toast.success('Downloaded hermes-desktop-cpp-rust.zip project archive!');
+    } catch (err) {
+      toast.error('Failed to package project');
     }
-  };
-
-  // Run all scenarios sequentially
-  const handleRunAll = async () => {
-    if (isRunningAll) return;
-    setIsRunningAll(true);
-    engine.addLog('INFO', 'SUITE', `Starting batch execution of all ${scenarios.length} scenarios...`);
-    toast.info(`Executing all ${scenarios.length} test scenarios...`);
-
-    for (const scen of scenarios) {
-      setRunningId(scen.id);
-      setScenarios((prev) =>
-        prev.map((s) => (s.id === scen.id ? { ...s, status: 'running' } : s))
-      );
-      try {
-        const result = await engine.runScenario(scen);
-        setScenarios((prev) =>
-          prev.map((s) =>
-            s.id === scen.id
-              ? {
-                  ...s,
-                  status: result.allPassed ? 'passed' : 'failed',
-                  lastResult: result,
-                }
-              : s
-          )
-        );
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    setRunningId(null);
-    setIsRunningAll(false);
-    engine.addLog('INFO', 'SUITE', 'All benchmark scenarios completed.');
-    toast.success('All benchmark scenarios finished evaluation.');
-  };
-
-  const handleStrategyChange = (strategy: RoutingStrategy) => {
-    const updated = { ...config, defaultStrategy: strategy };
-    setConfig(updated);
-    engine.updateConfig(updated);
-    toast.info(`Routing policy set to: ${strategy}`);
-  };
-
-  const handleClearLogs = () => {
-    engine.clearLogs();
-    setLogs([]);
-    toast.success('Console logs cleared.');
   };
 
   return (
-    <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Top Navigation & Status Bar */}
-      <Header
-        config={config}
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* Native Desktop Window Bar */}
+      <DesktopTitleBar
+        currentModel={currentModel}
+        models={models}
+        onSelectModel={setCurrentModel}
+        telemetry={telemetry}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onRunAll={handleRunAll}
-        isRunningAll={isRunningAll}
-        onStrategyChange={handleStrategyChange}
-        backendHealthy={backendHealthy}
-        onPing={handlePing}
-        isPinging={isPinging}
-        daemonActive={daemonActive}
-        onToggleDaemon={handleToggleDaemon}
-        liveRps={liveRps}
+        onExportZip={handleExportZip}
+        osStyle={osStyle}
+        onChangeOsStyle={setOsStyle}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
-        {/* Telemetry Key Stats */}
-        <TelemetryOverview 
-          scenarios={scenarios} 
-          liveRps={liveRps}
-          totalTokensProcessed={totalTokensProcessed}
-          daemonActive={daemonActive}
-        />
+      {/* Main App Container */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Navigation Tabs Bar */}
+        <div className="bg-slate-950 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <TabsList className="bg-slate-900/90 border border-slate-800 p-1 h-9 rounded-lg">
+                <TabsTrigger 
+                  value="chat" 
+                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  <span>Agent Workspace</span>
+                </TabsTrigger>
 
-        {/* Tab Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
-            <TabsList className="bg-[#0c1322] border border-slate-800 p-1 rounded-xl h-11">
-              <TabsTrigger
-                value="scenarios"
-                className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300 data-[state=active]:border-cyan-500/50 text-slate-400 font-mono text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Test Suites</span>
-                <Badge className="bg-emerald-950/80 text-emerald-300 text-[10px] ml-1 px-1.5 py-0 border border-emerald-800/60">
-                  {scenarios.filter(s => s.status === 'passed').length}/{scenarios.length}
-                </Badge>
-              </TabsTrigger>
+                <TabsTrigger 
+                  value="telemetry" 
+                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>C++ & Rust Architecture</span>
+                </TabsTrigger>
 
-              <TabsTrigger
-                value="playground"
-                className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300 data-[state=active]:border-cyan-500/50 text-slate-400 font-mono text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>Router Playground</span>
-              </TabsTrigger>
+                <TabsTrigger 
+                  value="skills" 
+                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>Skills & Sandbox Tools</span>
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-1 bg-slate-800 text-slate-300">
+                    {skills.length}
+                  </Badge>
+                </TabsTrigger>
 
-              <TabsTrigger
-                value="logs"
-                className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300 data-[state=active]:border-cyan-500/50 text-slate-400 font-mono text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
-              >
-                <Terminal className="w-3.5 h-3.5" />
-                <span>Execution Logs</span>
-                <span className={`w-2 h-2 rounded-full ml-1 inline-block ${daemonActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-              </TabsTrigger>
+                <TabsTrigger 
+                  value="codebase" 
+                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+                >
+                  <FolderTree className="w-3.5 h-3.5" />
+                  <span>C++ & Rust Codebase</span>
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse ml-0.5" />
+                </TabsTrigger>
+              </TabsList>
 
-              <TabsTrigger
-                value="docs"
-                className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300 data-[state=active]:border-cyan-500/50 text-slate-400 font-mono text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>Architecture</span>
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Live Daemon Status Indicator */}
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
-                <span className={`w-2 h-2 rounded-full ${daemonActive ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-slate-500'}`} />
-                <span className="text-slate-400">Stream:</span>
-                <span className={daemonActive ? 'text-emerald-400 font-semibold' : 'text-slate-400'}>
-                  {daemonActive ? 'LIVE ACTIVE' : 'PAUSED'}
+              {/* Status pill on right */}
+              <div className="hidden xl:flex items-center gap-2 text-xs font-mono text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  Rust Memory Safety Guaranteed
                 </span>
-              </span>
-              <span className="hidden md:inline px-2 py-1 rounded bg-slate-900 border border-slate-800 text-cyan-300">
-                {config.backendMode === 'mock' ? 'local://systemone-sandbox' : config.backendUrl}
-              </span>
-            </div>
-          </div>
-
-          {/* TAB 1: Scenarios & Test Suite Runner */}
-          <TabsContent value="scenarios" className="focus-visible:outline-none">
-            <ScenarioRunner
-              engine={engine}
-              scenarios={scenarios}
-              onUpdateScenarios={setScenarios}
-              onRunScenario={handleRunScenario}
-              runningId={runningId}
-            />
-          </TabsContent>
-
-          {/* TAB 2: Router Playground */}
-          <TabsContent value="playground" className="focus-visible:outline-none">
-            <RouterPlayground
-              engine={engine}
-              config={config}
-              onUpdateConfig={(newCfg) => {
-                setConfig(newCfg);
-                engine.updateConfig(newCfg);
-              }}
-            />
-          </TabsContent>
-
-          {/* TAB 3: Real-time Telemetry Logs */}
-          <TabsContent value="logs" className="focus-visible:outline-none">
-            <ConsoleLogStreamer
-              logs={logs}
-              onClearLogs={handleClearLogs}
-            />
-          </TabsContent>
-
-          {/* TAB 4: Architecture & API Docs */}
-          <TabsContent value="docs" className="focus-visible:outline-none">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="p-6 rounded-2xl bg-[#0d1424] border border-slate-800 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
-                      <Cpu className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-slate-100">About SystemOne Harness</h3>
-                      <p className="text-xs text-slate-400 font-mono">
-                        Repository: github.com/HarnessRouter/SystemOneHarness
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    <strong>SystemOneHarness</strong> is an enterprise evaluation, routing arbitration, and testing framework engineered for high-throughput AI systems, agent cascades, and multi-model router orchestration. It enables developers to benchmark latency, token cost, output invariant conformance, and fallback circuit breakers across heterogeneous model providers.
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div className="p-3.5 rounded-xl bg-[#080d1a] border border-slate-800 text-xs space-y-1.5">
-                      <div className="font-semibold text-cyan-300 flex items-center gap-1.5">
-                        <Zap className="w-4 h-4" />
-                        Dynamic Route Arbitration
-                      </div>
-                      <p className="text-slate-400 leading-relaxed font-mono text-[11px]">
-                        Scoring incoming prompts based on AST complexity, token bounds, and latency SLAs to route to Claude 3.5, GPT-4o, DeepSeek-V3, or local vLLM.
-                      </p>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-[#080d1a] border border-slate-800 text-xs space-y-1.5">
-                      <div className="font-semibold text-indigo-300 flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4" />
-                        Circuit Breaker Fallback
-                      </div>
-                      <p className="text-slate-400 leading-relaxed font-mono text-[11px]">
-                        Continuous node health monitoring. Automatically diverts traffic to secondary open-weight nodes upon 503 or latency spikes &gt; 600ms.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Integration CLI Guide */}
-                <div className="p-6 rounded-2xl bg-[#0d1424] border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-slate-200 font-mono flex items-center gap-2">
-                      <Terminal className="w-4 h-4 text-cyan-400" />
-                      Connecting Your Backend Service
-                    </h4>
-                    <Badge variant="outline" className="text-[10px] font-mono border-slate-700 text-slate-400">
-                      HTTP REST Specs
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-3 text-xs font-mono text-slate-300">
-                    <p className="text-slate-400 font-sans">
-                      To run your local or remote SystemOneHarness backend with this web console, run your server and configure the endpoint in <strong>Config</strong>:
-                    </p>
-
-                    <div className="p-3 rounded-xl bg-[#080d1a] border border-slate-800 text-cyan-300 space-y-1">
-                      <div className="text-slate-500"># 1. Clone SystemOneHarness repository</div>
-                      <div>git clone https://github.com/HarnessRouter/SystemOneHarness.git</div>
-                      <div className="text-slate-500 mt-2"># 2. Start the harness runner service</div>
-                      <div>cd SystemOneHarness && python -m harness.server --port 8000</div>
-                      <div className="text-slate-500 mt-2"># 3. Enter http://localhost:8000 into the Console Settings</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Active Model Nodes */}
-              <div className="space-y-4">
-                <div className="p-5 rounded-2xl bg-[#0d1424] border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-200 uppercase font-mono flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-cyan-400" />
-                      Model Routing Nodes
-                    </h4>
-                    <span className="text-[10px] font-mono text-emerald-400">5 Live</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {AVAILABLE_ROUTES.map((node) => (
-                      <div key={node.id} className="p-3 rounded-xl bg-[#080d1a] border border-slate-800 text-xs space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-200 font-mono">{node.name}</span>
-                          <Badge variant="outline" className="text-[9px] font-mono border-cyan-900/60 text-cyan-300 bg-cyan-950/30">
-                            {node.provider}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                          <span>Avg Latency: <span className="text-cyan-300">{node.latencyMsAvg}ms</span></span>
-                          <span>Cost: <span className="text-slate-200">${node.costPer1kTokens}/1k</span></span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {node.capabilities.map((cap, i) => (
-                            <span key={i} className="text-[10px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-400 font-mono">
-                              {cap}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <span>•</span>
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                  Zero-Copy CXX Bridge Active
+                </span>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+
+            {/* Tab Contents */}
+            <div className="mt-2 h-[calc(100vh-108px)] overflow-hidden">
+              <TabsContent value="chat" className="h-full m-0 data-[state=inactive]:hidden">
+                <AgentChatView
+                  messages={messages}
+                  onSendMessage={handleSendMessage}
+                  isGenerating={isGenerating}
+                  onClearChat={handleClearChat}
+                  currentModel={currentModel}
+                />
+              </TabsContent>
+
+              <TabsContent value="telemetry" className="h-full m-0 data-[state=inactive]:hidden">
+                <TelemetryEngineView
+                  telemetry={telemetry}
+                  model={currentModel}
+                  onRefreshTelemetry={() => setTelemetry(generateTelemetry())}
+                />
+              </TabsContent>
+
+              <TabsContent value="skills" className="h-full m-0 data-[state=inactive]:hidden">
+                <SkillsManagerView
+                  skills={skills}
+                  onToggleSkill={handleToggleSkill}
+                  onAddSkill={handleAddSkill}
+                />
+              </TabsContent>
+
+              <TabsContent value="codebase" className="h-full m-0 data-[state=inactive]:hidden">
+                <CodebaseExporterView />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+      </div>
 
       {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        config={config}
-        onSaveConfig={(newConfig) => {
-          setConfig(newConfig);
-          engine.updateConfig(newConfig);
-          toast.success('Configuration saved.');
-        }}
-        engine={engine}
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        currentModel={currentModel}
+        onUpdateModelConfig={handleUpdateModelConfig}
       />
 
-      {/* Footer */}
-      <footer className="mt-auto border-t border-slate-900 py-4 px-4 text-center text-xs text-slate-500 font-mono">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>SystemOne Harness Console • Built for HarnessRouter/SystemOneHarness</span>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSettingsOpen(true)}
-              className="text-slate-400 hover:text-cyan-300 transition-colors"
-            >
-              Configure Endpoint
-            </button>
-            <span>•</span>
-            <a 
-              href="https://github.com/HarnessRouter/SystemOneHarness" 
-              target="_blank" 
-              rel="noreferrer"
-              className="text-slate-400 hover:text-cyan-300 transition-colors inline-flex items-center gap-1"
-            >
-              GitHub <ExternalLink className="w-2.5 h-2.5" />
-            </a>
-          </div>
-        </div>
-        <div className="mt-3">
-          <MadeWithDyad />
-        </div>
-      </footer>
+      {/* Floating Made with Dyad Badge */}
+      <div className="fixed bottom-2 right-4 z-50 pointer-events-auto">
+        <MadeWithDyad />
+      </div>
     </div>
   );
 };
