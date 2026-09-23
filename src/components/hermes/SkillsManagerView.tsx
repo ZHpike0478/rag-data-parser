@@ -62,7 +62,7 @@ export const SkillsManagerView: React.FC<SkillsManagerViewProps> = ({
     } else if (skill.id === 'skill-cxx') {
       setTestParamInput('printf("Zero-overhead C++ SIMD check: %d\\n", __AVX2__);');
     } else {
-      setTestParamInput('query: "Hermes architecture documentation"');
+      setTestParamInput('query: "Zeus architecture documentation"');
     }
   };
 
@@ -78,7 +78,7 @@ export const SkillsManagerView: React.FC<SkillsManagerViewProps> = ({
 Spawned isolated thread with cgroups limit: 512MB
 Command: ${testParamInput}
 STDOUT:
-Linux hermes-desktop 6.5.0-x86_64 #1 SMP PREEMPT_DYNAMIC
+Linux zeus-desktop 6.5.0-x86_64 #1 SMP PREEMPT_DYNAMIC
 cargo 1.78.0 (2c72b83 2024-05-02)
 Status: Completed with exit code 0 (execution: 14ms)`);
       } else {
@@ -99,7 +99,7 @@ Status: Success (execution: 3ms)`);
     const newSkill: HermesSkill = {
       id: 'skill-custom-' + Date.now(),
       name: newSkillName.toLowerCase().replace(/\s+/g, '_'),
-      description: newSkillDesc || 'Custom user-defined tool for Hermes Desktop agent',
+      description: newSkillDesc || 'Custom user-defined tool for Zeus Desktop agent',
       category: newSkillCategory,
       implementedIn: newSkillImpl,
       enabled: true,
@@ -131,10 +131,10 @@ Status: Success (execution: 3ms)`);
         <div>
           <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
             <Wrench className="w-5 h-5 text-cyan-400" />
-            Hermes Agent Skills & Sandboxed Tools
+            Zeus Agent Skills & Sandboxed Tools
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Registered tool capabilities available to the Hermes autonomous agent loop via &lt;tool_call&gt; syntax.
+            Registered tool capabilities available to the Zeus autonomous agent loop via &lt;tool_call&gt; syntax.
           </p>
         </div>
 
@@ -304,10 +304,10 @@ Status: Success (execution: 3ms)`);
             <DialogHeader>
               <DialogTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
                 <Plus className="w-4 h-4 text-cyan-400" />
-                Register Custom Hermes Skill
+                Register Custom Zeus Skill
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-400">
-                Add a new tool that the Hermes agent can automatically invoke using &lt;tool_call&gt;.
+                Add a new tool that the Zeus agent can automatically invoke using &lt;tool_call&gt;.
               </DialogDescription>
             </DialogHeader>
 
@@ -332,7 +332,7 @@ Status: Success (execution: 3ms)`);
                 <Textarea
                   value={newSkillDesc}
                   onChange={(e) => setNewSkillDesc(e.target.value)}
-                  placeholder="Explains what the tool does and when Hermes should call it..."
+                  placeholder="Explains what the tool does and when Zeus should call it..."
                   className="bg-slate-950 border-slate-800 text-slate-200 text-xs min-h-[60px]"
                   required
                 />

@@ -36,7 +36,7 @@ export const CodebaseExporterView: React.FC = () => {
     try {
       setIsZipping(true);
       await downloadProjectZip();
-      toast.success('Downloaded hermes-desktop-cpp-rust.zip! Ready to build natively.');
+      toast.success('Downloaded zeus-desktop-cpp-rust.zip! Ready to build natively.');
     } catch (err) {
       toast.error('Failed to generate ZIP archive');
     } finally {
@@ -126,7 +126,7 @@ export const CodebaseExporterView: React.FC = () => {
               <code>
                 chmod +x build.sh<br/>
                 ./build.sh<br/>
-                ./target/release/hermes-desktop
+                ./target/release/zeus-desktop
               </code>
             </div>
             <p className="text-[10px] text-slate-500 font-sans leading-relaxed">

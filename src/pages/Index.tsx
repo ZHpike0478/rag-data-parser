@@ -58,7 +58,7 @@ const Index: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Handle user dispatching a message to Hermes
+  // Handle user dispatching a message to Zeus
   const handleSendMessage = useCallback((text: string) => {
     const userMsg: AgentMessage = {
       id: 'msg-' + Date.now(),
@@ -81,7 +81,7 @@ const Index: React.FC = () => {
 
   const handleClearChat = () => {
     setMessages([]);
-    toast.info('Hermes workspace session reset');
+    toast.info('Zeus workspace session reset');
   };
 
   const handleToggleSkill = (skillId: string) => {
@@ -99,7 +99,7 @@ const Index: React.FC = () => {
   const handleExportZip = async () => {
     try {
       await downloadProjectZip();
-      toast.success('Downloaded hermes-desktop-cpp-rust.zip project archive!');
+      toast.success('Downloaded zeus-desktop-cpp-rust.zip project archive!');
     } catch (err) {
       toast.error('Failed to package project');
     }

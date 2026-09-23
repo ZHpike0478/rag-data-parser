@@ -182,7 +182,7 @@ export const TelemetryEngineView: React.FC<TelemetryEngineViewProps> = ({
             Dual-Engine System Flow & Memory Boundaries
           </CardTitle>
           <CardDescription className="text-xs text-slate-400">
-            How Hermes Desktop routes high-level agent reasoning through Rust and raw tensor operations through C++
+            How Zeus Desktop routes high-level agent reasoning through Rust and raw tensor operations through C++
           </CardDescription>
         </CardHeader>
 
@@ -201,7 +201,7 @@ export const TelemetryEngineView: React.FC<TelemetryEngineViewProps> = ({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] text-slate-300 mt-2">
                 <div className="bg-slate-900/90 p-2 rounded border border-slate-800">
-                  <span className="text-orange-400 font-semibold">Agent Loop:</span> Hermes 3 reasoning, XML tag parser, tool dispatcher
+                  <span className="text-orange-400 font-semibold">Agent Loop:</span> Zeus multi-turn reasoning, XML tag parser, tool dispatcher
                 </div>
                 <div className="bg-slate-900/90 p-2 rounded border border-slate-800">
                   <span className="text-orange-400 font-semibold">Sandboxing:</span> Child process namespaces, timeout guards, signal traps

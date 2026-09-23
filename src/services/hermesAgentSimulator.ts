@@ -8,8 +8,8 @@ import {
 
 export const DEFAULT_MODELS: HermesModelConfig[] = [
   {
-    id: 'hermes-3-8b',
-    name: 'Hermes 3 (Llama 3.1 8B Instruct)',
+    id: 'zeus-3-8b',
+    name: 'Zeus 3 (Llama 3.1 8B Instruct)',
     quantization: 'Q4_K_M (4.92 GB GGUF)',
     contextLength: 131072,
     gpuLayers: 33,
@@ -19,8 +19,8 @@ export const DEFAULT_MODELS: HermesModelConfig[] = [
     topP: 0.95,
   },
   {
-    id: 'hermes-3-70b',
-    name: 'Hermes 3 (Llama 3.1 70B Enterprise)',
+    id: 'zeus-3-70b',
+    name: 'Zeus 3 (Llama 3.1 70B Enterprise)',
     quantization: 'Q4_K_S (39.8 GB GGUF)',
     contextLength: 65536,
     gpuLayers: 80,
@@ -30,8 +30,8 @@ export const DEFAULT_MODELS: HermesModelConfig[] = [
     topP: 0.9,
   },
   {
-    id: 'hermes-2-pro-7b',
-    name: 'Hermes 2 Pro (Mistral 7B)',
+    id: 'zeus-2-pro-7b',
+    name: 'Zeus 2 Pro (Mistral 7B)',
     quantization: 'Q5_K_M (5.13 GB GGUF)',
     contextLength: 32768,
     gpuLayers: 32,
@@ -83,7 +83,7 @@ export const DEFAULT_SKILLS: HermesSkill[] = [
   {
     id: 'skill-vector',
     name: 'vector_memory_search',
-    description: 'Perform cosine similarity retrieval across Hermes long-term episodic memory SQLite database.',
+    description: 'Perform cosine similarity retrieval across Zeus long-term episodic memory SQLite database.',
     category: 'memory',
     implementedIn: 'Rust',
     enabled: true,
@@ -134,10 +134,10 @@ Step 3: Verify Rust Tokio thread pool isolation.`,
         name: 'cxx_eval_kernel',
         arguments: {
           code: `#include <chrono>
-#include "hermes/bridge.hpp"
+#include "zeus/bridge.hpp"
 
 auto start = std::chrono::high_resolution_clock::now();
-auto engine = hermes::bridge::create_native_engine();
+auto engine = zeus::bridge::create_native_engine();
 auto end = std::chrono::high_resolution_clock::now();
 double latency_us = std::chrono::duration<double, std::micro>(end - start).count();
 printf("Engine instantiation latency: %.3f us\\n", latency_us);`,
@@ -161,7 +161,7 @@ Exit code: 0`,
         },
         result: `[Rust Sandbox Execution]
 $ cargo check --workspace --release
-    Checking hermes-desktop v0.2.0 (/workspace)
+    Checking zeus-desktop v0.2.0 (/workspace)
     Finished \`release\` profile [optimized] target(s) in 0.82s
 Native binary verified. 0 warnings, 0 lifetime leaks.`,
         status: 'completed',
@@ -188,7 +188,7 @@ export const PRESET_SCENARIOS = [
     badge: 'Rust Tokio',
   },
   {
-    title: 'Hermes Autonomous Function Calling',
+    title: 'Zeus Autonomous Function Calling',
     prompt: 'Search the local vector memory for recent C++ build flags and update the CMake configuration.',
     badge: 'Agent Loop',
   },
@@ -349,11 +349,11 @@ ASAN: AddressSanitizer clean. All 10,000 concurrent ring-buffer insertions compl
     };
   }
 
-  // Generic intelligent Hermes Agent response with tool call simulation
+  // Generic intelligent Zeus Agent response with tool call simulation
   return {
     id: 'msg-' + Date.now(),
     role: 'assistant',
-    content: `I've processed your instruction: **"${userPrompt}"** through the Hermes dual-engine runtime.
+    content: `I've processed your instruction: **"${userPrompt}"** through the Zeus dual-engine runtime.
 
 ### Execution Summary:
 - **Rust Supervisor:** Spawned worker thread on Tokio runtime (PID 8192) with strict sandbox constraints.
@@ -362,7 +362,7 @@ ASAN: AddressSanitizer clean. All 10,000 concurrent ring-buffer insertions compl
 
 The environment is synchronized and ready for the next command.`,
     thought: `User prompted: "${userPrompt}".
-1. Analyze user intention against active Hermes toolset.
+1. Analyze user intention against active Zeus toolset.
 2. Formulate tool call sequence.
 3. Verify output integrity in Rust sandbox.`,
     toolCalls: [

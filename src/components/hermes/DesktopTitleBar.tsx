@@ -58,20 +58,20 @@ export const DesktopTitleBar: React.FC<DesktopTitleBarProps> = ({
         )}
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-cyan-500/20">
-            <Terminal className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 via-cyan-400 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-md shadow-cyan-500/20">
+            <Zap className="w-4 h-4 text-slate-950 fill-slate-950 stroke-[2.5]" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold tracking-tight text-slate-100 text-sm">
-                Hermes Desktop
+              <span className="font-semibold tracking-tight text-slate-100 text-sm flex items-center gap-1">
+                Zeus Desktop
               </span>
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50">
                 C++ & Rust Core
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-mono hidden sm:block">
-              v0.2.0 • Native Workstation
+              v0.2.0 • Ultra-Fast AI Workstation
             </p>
           </div>
         </div>
@@ -179,7 +179,7 @@ export const DesktopTitleBar: React.FC<DesktopTitleBarProps> = ({
           variant="ghost"
           size="icon"
           className="h-8 w-8 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-          title="Hermes Settings & Inference Config"
+          title="Zeus Settings & Inference Config"
         >
           <Settings className="w-4 h-4" />
         </Button>

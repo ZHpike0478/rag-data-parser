@@ -76,3 +76,6 @@ export interface ProjectFile {
   content: string;
   description: string;
 }
+
+export type ZeusModelConfig = HermesModelConfig;
+export type ZeusSkill = HermesSkill;

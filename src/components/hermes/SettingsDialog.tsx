@@ -42,7 +42,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [temperature, setTemperature] = useState<number>(currentModel.temperature);
   const [contextLength, setContextLength] = useState<number>(currentModel.contextLength);
   const [systemPrompt, setSystemPrompt] = useState<string>(
-    'You are Hermes 3, an autonomous AI workstation agent built in Rust and C++ with native function calling, tool execution, and local hardware acceleration.'
+    'You are Zeus, an ultra-fast autonomous AI workstation agent built in Rust and C++ with native function calling, tool execution, and local hardware acceleration.'
   );
 
   const handleSave = () => {
@@ -52,7 +52,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       temperature,
       contextLength,
     });
-    toast.success('Hermes C++ & Rust engine settings updated');
+    toast.success('Zeus C++ & Rust engine settings updated');
     onOpenChange(false);
   };
 
@@ -62,7 +62,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="text-sm font-bold flex items-center gap-2 text-slate-100">
             <Settings className="w-4 h-4 text-cyan-400" />
-            Hermes Desktop Configuration & Runtime Flags
+            Zeus Desktop Configuration & Runtime Flags
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400">
             Configure C++ llama.cpp tensor offloading, Rust thread pool, and agent personality.
@@ -149,7 +149,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           {/* System Prompt */}
           <div>
             <label className="text-[11px] font-medium text-slate-400 block mb-1">
-              Hermes 3 System Prompt & Instructions
+              Zeus System Prompt & Instructions
             </label>
             <Textarea
               value={systemPrompt}

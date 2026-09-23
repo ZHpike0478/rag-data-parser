@@ -89,7 +89,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
           </span>
-          <span className="text-slate-300 font-medium">Hermes Agent Session</span>
+          <span className="text-slate-300 font-medium">Zeus Agent Session</span>
           <span className="text-slate-500">•</span>
           <span className="font-mono text-cyan-400/90">{currentModel.name}</span>
           <span className="text-slate-500">•</span>
@@ -142,7 +142,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
                       >
                         <div className="flex items-center gap-2">
                           <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                          <span className="font-semibold text-slate-300">Hermes Scratchpad & Reasoning</span>
+                          <span className="font-semibold text-slate-300">Zeus Scratchpad & Reasoning</span>
                           <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
                             &lt;scratchpad&gt;
                           </span>
@@ -323,7 +323,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
               <span className="text-xs font-mono text-cyan-300">
-                Hermes C++ inference streaming & Tokio sandbox evaluating...
+                Zeus C++ inference streaming & Tokio sandbox evaluating...
               </span>
             </div>
           </div>
@@ -363,7 +363,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
                   handleSubmit(e);
                 }
               }}
-              placeholder="Ask Hermes to inspect system performance, run sandboxed C++ kernels, or refactor code..."
+              placeholder="Ask Zeus to inspect system performance, run sandboxed C++ kernels, or refactor code..."
               className="w-full bg-transparent border-none text-slate-100 text-sm focus-visible:ring-0 resize-none min-h-[64px] max-h-[140px] pr-20 py-3"
             />
 
