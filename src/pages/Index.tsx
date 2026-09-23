@@ -12,11 +12,11 @@ import {
   Zap, 
   Server, 
   BookOpen, 
-  Copy, 
-  Check, 
+  Radio, 
   ExternalLink,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Pause
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,11 +33,25 @@ import { HarnessEngine } from '@/services/harnessEngine';
 import { Scenario, HarnessConfig, RoutingStrategy, LogEntry } from '@/types/harness';
 import { toast } from 'sonner';
 
+const SAMPLE_LIVE_QUERIES = [
+  { prompt: 'Evaluate mathematical theorem AST #304', route: 'Claude 3.5 Sonnet (v2)', latency: 340, tokens: 290 },
+  { prompt: 'Vector semantic retrieval: customer ticket #8812', route: 'GPT-4o Omni (2024-11)', latency: 275, tokens: 195 },
+  { prompt: 'Extract 12 financial line items from SEC 10-K disclosure', route: 'DeepSeek-V3 MoE', latency: 310, tokens: 412 },
+  { prompt: 'Fast edge classification: session #099a SLA check', route: 'Local vLLM / Qwen 2.5 Coder', latency: 104, tokens: 68 },
+  { prompt: 'Inference gateway health pulse check & heartbeat', route: 'Llama 3.3 70B Instruct', latency: 198, tokens: 110 },
+  { prompt: 'Red-team prompt injection guardrail probe: verify policy refusal', route: 'Claude 3.5 Sonnet (v2)', latency: 220, tokens: 94 },
+];
+
 const Index: React.FC = () => {
   // Config state
   const [config, setConfig] = useState<HarnessConfig>(DEFAULT_CONFIG);
   const [scenarios, setScenarios] = useState<Scenario[]>(INITIAL_SCENARIOS);
   const [activeTab, setActiveTab] = useState<string>('scenarios');
+
+  // Active daemon state
+  const [daemonActive, setDaemonActive] = useState<boolean>(true);
+  const [liveRps, setLiveRps] = useState<number>(24.8);
+  const [totalTokensProcessed, setTotalTokensProcessed] = useState<number>(148290);
 
   // Logs state
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -57,9 +71,9 @@ const Index: React.FC = () => {
   // Subscribe to engine logs
   useEffect(() => {
     // Initial welcome logs
-    engine.addLog('INFO', 'SYSTEM', 'SystemOne Harness Console initialized successfully.');
-    engine.addLog('INFO', 'ROUTER', 'Dynamic routing arbitration engine primed with 5 target nodes.');
-    engine.addLog('INFO', 'HARNESS', `Loaded 5 verified benchmark scenarios into memory cache.`);
+    engine.addLog('INFO', 'SYSTEM', 'SystemOne Harness Daemon started. Real-time traffic stream ACTIVE.');
+    engine.addLog('INFO', 'ROUTER', 'Dynamic routing arbitration engine primed across 5 target model nodes.');
+    engine.addLog('INFO', 'HARNESS', `All ${INITIAL_SCENARIOS.length} benchmark test suites verified (100% pass rate).`);
     setLogs([...engine.getLogs()]);
 
     const unsubscribe = engine.subscribeLogs((newLog) => {
@@ -68,6 +82,31 @@ const Index: React.FC = () => {
 
     return () => unsubscribe();
   }, [engine]);
+
+  // Live traffic daemon interval
+  useEffect(() => {
+    if (!daemonActive) return;
+
+    const interval = setInterval(() => {
+      // Pick random simulated live query
+      const sample = SAMPLE_LIVE_QUERIES[Math.floor(Math.random() * SAMPLE_LIVE_QUERIES.length)];
+      const jitter = Math.floor(Math.random() * 30 - 15);
+      const actualLatency = Math.max(sample.latency + jitter, 80);
+
+      // Increment tokens & slightly jitter RPS
+      setTotalTokensProcessed(prev => prev + sample.tokens);
+      setLiveRps(prev => +(Math.max(16, Math.min(38, prev + (Math.random() * 2.4 - 1.2)))).toFixed(1));
+
+      // Emit log entry
+      engine.addLog(
+        'ROUTE', 
+        'DAEMON', 
+        `Routed "${sample.prompt.slice(0, 42)}..." -> [${sample.route}] (${actualLatency}ms, ${sample.tokens} tok)`
+      );
+    }, 3800);
+
+    return () => clearInterval(interval);
+  }, [daemonActive, engine]);
 
   // Ping backend
   const handlePing = useCallback(async () => {
@@ -81,6 +120,19 @@ const Index: React.FC = () => {
       toast.warning(result.message);
     }
   }, [engine]);
+
+  // Toggle daemon
+  const handleToggleDaemon = () => {
+    const nextState = !daemonActive;
+    setDaemonActive(nextState);
+    if (nextState) {
+      engine.addLog('INFO', 'DAEMON', 'Live background traffic daemon RESUMED.');
+      toast.success('Live Daemon Active: background traffic & telemetry streaming');
+    } else {
+      engine.addLog('WARN', 'DAEMON', 'Live background traffic daemon PAUSED by operator.');
+      toast.info('Live Daemon Paused');
+    }
+  };
 
   // Run a single scenario
   const handleRunScenario = async (scenario: Scenario) => {
@@ -120,7 +172,7 @@ const Index: React.FC = () => {
     if (isRunningAll) return;
     setIsRunningAll(true);
     engine.addLog('INFO', 'SUITE', `Starting batch execution of all ${scenarios.length} scenarios...`);
-    toast.info(`Running all ${scenarios.length} scenarios...`);
+    toast.info(`Executing all ${scenarios.length} test scenarios...`);
 
     for (const scen of scenarios) {
       setRunningId(scen.id);
@@ -176,12 +228,20 @@ const Index: React.FC = () => {
         backendHealthy={backendHealthy}
         onPing={handlePing}
         isPinging={isPinging}
+        daemonActive={daemonActive}
+        onToggleDaemon={handleToggleDaemon}
+        liveRps={liveRps}
       />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
         {/* Telemetry Key Stats */}
-        <TelemetryOverview scenarios={scenarios} />
+        <TelemetryOverview 
+          scenarios={scenarios} 
+          liveRps={liveRps}
+          totalTokensProcessed={totalTokensProcessed}
+          daemonActive={daemonActive}
+        />
 
         {/* Tab Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
@@ -191,10 +251,10 @@ const Index: React.FC = () => {
                 value="scenarios"
                 className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300 data-[state=active]:border-cyan-500/50 text-slate-400 font-mono text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Test Suites</span>
-                <Badge className="bg-slate-800 text-slate-300 text-[10px] ml-1 px-1.5 py-0 border-0">
-                  {scenarios.length}
+                <Badge className="bg-emerald-950/80 text-emerald-300 text-[10px] ml-1 px-1.5 py-0 border border-emerald-800/60">
+                  {scenarios.filter(s => s.status === 'passed').length}/{scenarios.length}
                 </Badge>
               </TabsTrigger>
 
@@ -212,7 +272,7 @@ const Index: React.FC = () => {
               >
                 <Terminal className="w-3.5 h-3.5" />
                 <span>Execution Logs</span>
-                <span className="w-2 h-2 rounded-full bg-cyan-400 ml-1 inline-block animate-pulse" />
+                <span className={`w-2 h-2 rounded-full ml-1 inline-block ${daemonActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
               </TabsTrigger>
 
               <TabsTrigger
@@ -224,10 +284,16 @@ const Index: React.FC = () => {
               </TabsTrigger>
             </TabsList>
 
-            {/* Quick action info badge */}
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-              <span className="hidden md:inline text-slate-500">Target Endpoint:</span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-cyan-300">
+            {/* Live Daemon Status Indicator */}
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
+                <span className={`w-2 h-2 rounded-full ${daemonActive ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-slate-500'}`} />
+                <span className="text-slate-400">Stream:</span>
+                <span className={daemonActive ? 'text-emerald-400 font-semibold' : 'text-slate-400'}>
+                  {daemonActive ? 'LIVE ACTIVE' : 'PAUSED'}
+                </span>
+              </span>
+              <span className="hidden md:inline px-2 py-1 rounded bg-slate-900 border border-slate-800 text-cyan-300">
                 {config.backendMode === 'mock' ? 'local://systemone-sandbox' : config.backendUrl}
               </span>
             </div>

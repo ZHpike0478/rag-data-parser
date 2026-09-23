@@ -57,6 +57,17 @@ export const RouterPlayground: React.FC<RouterPlaygroundProps> = ({
     candidateScores: { routeId: string; name: string; score: number; reason: string }[];
   } | null>(null);
 
+  // Automatically prime active result on initial load
+  React.useEffect(() => {
+    let mounted = true;
+    engine.dispatchPlaygroundPrompt(SAMPLE_PROMPTS[0].prompt, config.defaultStrategy, config.temperature, config.maxTokens)
+      .then(res => {
+        if (mounted) setResult(res);
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [engine, config.defaultStrategy, config.temperature, config.maxTokens]);
+
   const handleDispatch = async () => {
     if (!prompt.trim() || isLoading) return;
     setIsLoading(true);

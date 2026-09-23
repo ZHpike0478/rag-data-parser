@@ -5,9 +5,12 @@ import {
   GitBranch, 
   RefreshCw, 
   Play, 
+  Pause,
   ShieldCheck, 
   ExternalLink,
-  Cpu
+  Cpu,
+  Radio,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +25,9 @@ interface HeaderProps {
   backendHealthy: boolean;
   onPing: () => void;
   isPinging: boolean;
+  daemonActive: boolean;
+  onToggleDaemon: () => void;
+  liveRps: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,7 +38,10 @@ export const Header: React.FC<HeaderProps> = ({
   onStrategyChange,
   backendHealthy,
   onPing,
-  isPinging
+  isPinging,
+  daemonActive,
+  onToggleDaemon,
+  liveRps
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-cyan-950/60 bg-[#0a0f1d]/90 backdrop-blur-md px-4 lg:px-8 py-3 transition-all">
@@ -76,6 +85,25 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Center / Status info */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
+          {/* Live Daemon Toggle */}
+          <button
+            onClick={onToggleDaemon}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono text-xs transition-all ${
+              daemonActive 
+                ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]' 
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+            }`}
+            title="Toggle background harness daemon & real-time traffic pulse"
+          >
+            <span className={`w-2 h-2 rounded-full ${daemonActive ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'}`} />
+            <span className="font-bold">{daemonActive ? 'DAEMON: ACTIVE' : 'DAEMON: PAUSED'}</span>
+            {daemonActive ? (
+              <span className="text-[10px] bg-emerald-900/80 text-emerald-200 px-1 rounded ml-1">
+                {liveRps.toFixed(1)} rps
+              </span>
+            ) : null}
+          </button>
+
           {/* Engine Status pill */}
           <button
             onClick={onPing}
@@ -116,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-slate-950 font-semibold shadow-sm transition-all h-8 px-3 rounded-lg"
           >
             <Play className={`w-3.5 h-3.5 mr-1.5 fill-slate-950 ${isRunningAll ? 'animate-spin' : ''}`} />
-            {isRunningAll ? 'Running Suite...' : 'Run All Suites'}
+            {isRunningAll ? 'Running Suite...' : 'Re-Run All'}
           </Button>
 
           <Button
