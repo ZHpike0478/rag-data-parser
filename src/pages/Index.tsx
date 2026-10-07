@@ -1,286 +1,247 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
-  Terminal, 
-  Activity, 
-  Wrench, 
-  FolderTree, 
-  Sparkles,
-  Download,
-  Settings as SettingsIcon,
-  ShieldCheck,
-  Cpu,
+  Database, 
+  Layers, 
+  Sliders, 
+  Target, 
+  FileText, 
+  Sparkles, 
+  Download, 
   RefreshCw,
-  ExternalLink,
-  Code2,
-  Server
+  Plus,
+  Zap,
+  Info
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DesktopTitleBar } from '@/components/hermes/DesktopTitleBar';
-import { AgentChatView } from '@/components/hermes/AgentChatView';
-import { TelemetryEngineView } from '@/components/hermes/TelemetryEngineView';
-import { SkillsManagerView } from '@/components/hermes/SkillsManagerView';
-import { CodebaseExporterView } from '@/components/hermes/CodebaseExporterView';
-import { SettingsDialog } from '@/components/hermes/SettingsDialog';
+import { RagHeader } from '@/components/rag/RagHeader';
+import { FileUploadZone } from '@/components/rag/FileUploadZone';
+import { ChunkingControls } from '@/components/rag/ChunkingControls';
+import { ChunkVisualizer } from '@/components/rag/ChunkVisualizer';
+import { DocumentViewer } from '@/components/rag/DocumentViewer';
+import { RetrievalSimulatorTab } from '@/components/rag/RetrievalSimulatorTab';
+import { ExportDialog } from '@/components/rag/ExportDialog';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { 
-  DEFAULT_MODELS, 
-  DEFAULT_SKILLS, 
-  INITIAL_CONVERSATION, 
-  generateTelemetry 
-} from '@/services/hermesAgentSimulator';
-import { downloadProjectZip } from '@/services/nativeCodebase';
-import { AgentMessage, EngineTelemetry, HermesModelConfig, HermesSkill } from '@/types/hermes';
-import { SessionStore, ChatSession, BackendEndpointConfig } from '@/services/sessionStore';
-import { RealAgentService } from '@/services/realAgentService';
-import { detectRealSystemInfo } from '@/services/realSystemService';
+  RagDocument, 
+  RagChunk, 
+  ChunkingConfig, 
+  PreprocessingConfig 
+} from '@/types/rag';
+import { RagPreprocessor, DEFAULT_PREPROCESSING_CONFIG } from '@/services/preprocessor';
+import { RagChunker, DEFAULT_CHUNKING_CONFIG } from '@/services/chunker';
+import { SAMPLE_DOCUMENTS } from '@/services/sampleDocuments';
 import { toast } from 'sonner';
 
 const Index: React.FC = () => {
-  // Navigation
-  const [activeTab, setActiveTab] = useState<string>('chat');
+  // Config state
+  const [chunkConfig, setChunkConfig] = useState<ChunkingConfig>(DEFAULT_CHUNKING_CONFIG);
+  const [prepConfig, setPrepConfig] = useState<PreprocessingConfig>(DEFAULT_PREPROCESSING_CONFIG);
 
-  // Persistent session state
-  const [sessions, setSessions] = useState<ChatSession[]>(() => SessionStore.getSessions());
-  const [activeSessionId, setActiveSessionId] = useState<string>(() => SessionStore.getActiveSessionId());
-  
-  // Endpoint config
-  const [endpointConfig, setEndpointConfig] = useState<BackendEndpointConfig>(() => SessionStore.getEndpointConfig());
+  // Documents state - initialize with default sample API guide
+  const [documents, setDocuments] = useState<RagDocument[]>(() => {
+    const defaultSample = SAMPLE_DOCUMENTS[0]; // Developer API spec
+    const cleaned = RagPreprocessor.cleanText(defaultSample.rawContent, DEFAULT_PREPROCESSING_CONFIG);
+    return [{
+      id: 'doc_default_sample',
+      name: defaultSample.name,
+      type: defaultSample.type,
+      extension: defaultSample.extension,
+      size: new Blob([defaultSample.rawContent]).size,
+      rawContent: defaultSample.rawContent,
+      cleanedContent: cleaned,
+      metadata: {
+        isSample: true,
+        description: defaultSample.description,
+        charCount: defaultSample.rawContent.length,
+        wordCount: defaultSample.rawContent.split(/\s+/).filter(Boolean).length,
+        estimatedTokens: RagChunker.estimateTokenCount(cleaned)
+      },
+      createdAt: Date.now()
+    }];
+  });
 
-  // Models & State
-  const [models, setModels] = useState<HermesModelConfig[]>(() => SessionStore.getModels());
-  const [currentModel, setCurrentModel] = useState<HermesModelConfig>(() => models[0] || DEFAULT_MODELS[0]);
-  const [skills, setSkills] = useState<HermesSkill[]>(() => SessionStore.getSkills());
-  const [telemetry, setTelemetry] = useState<EngineTelemetry>(generateTelemetry());
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [activeDocumentId, setActiveDocumentId] = useState<string>(() => documents[0]?.id || '');
+  const [documentFilterId, setDocumentFilterId] = useState<string | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<string>('chunks');
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
-  // Settings & OS styling
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [osStyle, setOsStyle] = useState<'macos' | 'linux' | 'windows'>('macos');
-
-  // Active session messages
-  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0];
-  const messages = activeSession ? activeSession.messages : [];
-
-  // Update telemetry with real host hardware upon mount
+  // Update activeDocumentId when documents change
   useEffect(() => {
-    detectRealSystemInfo().then((realSys) => {
-      setTelemetry(prev => ({
-        ...prev,
-        rust: {
-          ...prev.rust,
-          tokioWorkers: realSys.cpuCores,
-          memoryMb: realSys.heapMemoryUsedMb,
-        },
-        cpp: {
-          ...prev.cpp,
-          activeKernels: `${realSys.gpuRenderer} (Offloaded)`,
-        }
-      }));
-    });
+    if (documents.length > 0 && !documents.some(d => d.id === activeDocumentId)) {
+      setActiveDocumentId(documents[0].id);
+    }
+  }, [documents, activeDocumentId]);
+
+  // Generate chunks across all documents whenever documents or configs change
+  const chunks: RagChunk[] = useMemo(() => {
+    const allChunks: RagChunk[] = [];
+    for (const doc of documents) {
+      // Re-clean doc content according to active prepConfig
+      const cleaned = RagPreprocessor.cleanText(doc.rawContent, prepConfig);
+      const updatedDoc: RagDocument = { ...doc, cleanedContent: cleaned };
+      const docChunks = RagChunker.chunkDocument(updatedDoc, chunkConfig);
+      allChunks.push(...docChunks);
+    }
+    return allChunks;
+  }, [documents, chunkConfig, prepConfig]);
+
+  // Handler to add a single document
+  const handleAddDocument = useCallback((doc: RagDocument) => {
+    setDocuments(prev => [doc, ...prev]);
+    setActiveDocumentId(doc.id);
   }, []);
 
-  // Periodic simulated telemetry heartbeat
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTelemetry(generateTelemetry());
-    }, 5000);
-    return () => clearInterval(interval);
+  // Handler to add multiple documents
+  const handleAddMultipleDocuments = useCallback((newDocs: RagDocument[]) => {
+    setDocuments(prev => [...newDocs, ...prev]);
+    if (newDocs[0]) {
+      setActiveDocumentId(newDocs[0].id);
+    }
   }, []);
 
-  // Save sessions to storage whenever they change
-  const updateMessages = (newMessages: AgentMessage[]) => {
-    setSessions(prev => {
-      const next = prev.map(s => {
-        if (s.id === activeSessionId) {
-          return { ...s, messages: newMessages, updatedAt: new Date().toLocaleTimeString() };
-        }
-        return s;
-      });
-      SessionStore.saveSessions(next);
-      return next;
-    });
+  // Handler to remove a document
+  const handleRemoveDocument = useCallback((docId: string) => {
+    setDocuments(prev => prev.filter(d => d.id !== docId));
+    toast.info('Document removed');
+  }, []);
+
+  // Handler to clear all documents
+  const handleClearAll = () => {
+    setDocuments([]);
+    toast.info('Cleared all documents');
   };
 
-  // Handle user dispatching a message to Zeus with real data & tool execution
-  const handleSendMessage = useCallback(async (text: string) => {
-    const userMsg: AgentMessage = {
-      id: 'msg-' + Date.now(),
-      role: 'user',
-      content: text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    };
-
-    const updatedWithUser = [...messages, userMsg];
-    updateMessages(updatedWithUser);
-    setIsGenerating(true);
-
-    try {
-      // Execute real agent turn with live tools (web, github, math, system)
-      const assistantMsg = await RealAgentService.runAgentTurn(text, currentModel, endpointConfig);
-      updateMessages([...updatedWithUser, assistantMsg]);
-      setTelemetry(generateTelemetry());
-    } catch (err: any) {
-      toast.error('Error generating response: ' + err.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [messages, currentModel, endpointConfig]);
-
-  const handleClearChat = () => {
-    updateMessages([]);
-    toast.info('Zeus workspace session reset');
+  const handleUpdateChunkConfig = (partial: Partial<ChunkingConfig>) => {
+    setChunkConfig(prev => ({ ...prev, ...partial }));
   };
 
-  const handleToggleSkill = (skillId: string) => {
-    setSkills(prev => {
-      const next = prev.map(s => s.id === skillId ? { ...s, enabled: !s.enabled } : s);
-      SessionStore.saveSkills(next);
-      return next;
-    });
+  const handleUpdatePrepConfig = (partial: Partial<PreprocessingConfig>) => {
+    setPrepConfig(prev => ({ ...prev, ...partial }));
   };
 
-  const handleAddSkill = (newSkill: HermesSkill) => {
-    setSkills(prev => {
-      const next = [...prev, newSkill];
-      SessionStore.saveSkills(next);
-      return next;
-    });
-  };
-
-  const handleUpdateModelConfig = (updated: Partial<HermesModelConfig>) => {
-    setCurrentModel(prev => {
-      const next = { ...prev, ...updated };
-      return next;
-    });
-  };
-
-  const handleExportZip = async () => {
-    try {
-      await downloadProjectZip();
-      toast.success('Downloaded zeus-desktop-cpp-rust.zip project archive!');
-    } catch (err) {
-      toast.error('Failed to package project');
-    }
+  const handleRechunk = () => {
+    toast.success('RAG Pipeline re-executed with updated parameters!');
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Native Desktop Window Bar */}
-      <DesktopTitleBar
-        currentModel={currentModel}
-        models={models}
-        onSelectModel={setCurrentModel}
-        telemetry={telemetry}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onExportZip={handleExportZip}
-        osStyle={osStyle}
-        onChangeOsStyle={setOsStyle}
+    <div className="flex flex-col min-h-screen bg-[#080d1a] text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* Top Header with live stats and export triggers */}
+      <RagHeader
+        documents={documents}
+        chunks={chunks}
+        onOpenExport={() => setIsExportOpen(true)}
+        onClearAll={handleClearAll}
       />
 
-      {/* Main App Container */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Navigation Tabs Bar */}
-        <div className="bg-slate-950 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+      {/* Main Studio Body */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {/* Upload Zone & Quick Samples */}
+        <FileUploadZone
+          onAddDocument={handleAddDocument}
+          onAddMultipleDocuments={handleAddMultipleDocuments}
+        />
+
+        {/* Primary Workspace Navigation Tabs */}
+        <div className="space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <TabsList className="bg-slate-900/90 border border-slate-800 p-1 h-9 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2">
+              <TabsList className="bg-slate-900/90 border border-slate-800 p-1 rounded-xl h-10">
                 <TabsTrigger 
-                  value="chat" 
-                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+                  value="chunks" 
+                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
                 >
-                  <Terminal className="w-3.5 h-3.5" />
-                  <span>Agent Workspace</span>
-                </TabsTrigger>
-
-                <TabsTrigger 
-                  value="telemetry" 
-                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
-                >
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>C++ & Rust Architecture</span>
-                </TabsTrigger>
-
-                <TabsTrigger 
-                  value="skills" 
-                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
-                >
-                  <Wrench className="w-3.5 h-3.5" />
-                  <span>Skills & Sandbox Tools</span>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Chunk Inspector</span>
                   <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-1 bg-slate-800 text-slate-300">
-                    {skills.length}
+                    {chunks.length}
                   </Badge>
                 </TabsTrigger>
 
                 <TabsTrigger 
-                  value="codebase" 
-                  className="text-xs px-3 gap-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+                  value="simulator" 
+                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
                 >
-                  <FolderTree className="w-3.5 h-3.5" />
-                  <span>C++ & Rust Codebase</span>
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse ml-0.5" />
+                  <Target className="w-3.5 h-3.5" />
+                  <span>Retrieval Sandbox</span>
+                </TabsTrigger>
+
+                <TabsTrigger 
+                  value="pipeline" 
+                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Chunking Config</span>
+                </TabsTrigger>
+
+                <TabsTrigger 
+                  value="source_docs" 
+                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Documents & Cleaning</span>
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-1 bg-slate-800 text-slate-300">
+                    {documents.length}
+                  </Badge>
                 </TabsTrigger>
               </TabsList>
 
-              {/* Status pill on right */}
-              <div className="hidden xl:flex items-center gap-2 text-xs font-mono text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <Server className="w-3.5 h-3.5 text-cyan-400" />
-                  Provider: {endpointConfig.mode}
-                </span>
+              {/* Status information pill */}
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                <span className="text-cyan-400 font-semibold">{chunkConfig.strategy.replace('_', ' ')}</span>
                 <span>•</span>
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  Rust Tokio Sandbox
-                </span>
+                <span>{chunkConfig.chunkSize} chars</span>
+                <span>•</span>
+                <span className="text-indigo-400">{chunkConfig.chunkOverlap} overlap</span>
               </div>
             </div>
 
-            {/* Tab Contents */}
-            <div className="mt-2 h-[calc(100vh-108px)] overflow-hidden">
-              <TabsContent value="chat" className="h-full m-0 data-[state=inactive]:hidden">
-                <AgentChatView
-                  messages={messages}
-                  onSendMessage={handleSendMessage}
-                  isGenerating={isGenerating}
-                  onClearChat={handleClearChat}
-                  currentModel={currentModel}
-                />
-              </TabsContent>
+            {/* Tab 1: Chunk Visualizer */}
+            <TabsContent value="chunks" className="mt-4">
+              <ChunkVisualizer
+                chunks={chunks}
+                documents={documents}
+                activeDocumentId={documentFilterId}
+                onSelectDocumentFilter={setDocumentFilterId}
+              />
+            </TabsContent>
 
-              <TabsContent value="telemetry" className="h-full m-0 data-[state=inactive]:hidden">
-                <TelemetryEngineView
-                  telemetry={telemetry}
-                  model={currentModel}
-                  onRefreshTelemetry={() => setTelemetry(generateTelemetry())}
-                />
-              </TabsContent>
+            {/* Tab 2: Retrieval Simulator */}
+            <TabsContent value="simulator" className="mt-4">
+              <RetrievalSimulatorTab chunks={chunks} />
+            </TabsContent>
 
-              <TabsContent value="skills" className="h-full m-0 data-[state=inactive]:hidden">
-                <SkillsManagerView
-                  skills={skills}
-                  onToggleSkill={handleToggleSkill}
-                  onAddSkill={handleAddSkill}
-                />
-              </TabsContent>
+            {/* Tab 3: Chunking & Preprocessing Pipeline Controls */}
+            <TabsContent value="pipeline" className="mt-4">
+              <ChunkingControls
+                chunkConfig={chunkConfig}
+                onUpdateChunkConfig={handleUpdateChunkConfig}
+                prepConfig={prepConfig}
+                onUpdatePrepConfig={handleUpdatePrepConfig}
+                onRechunk={handleRechunk}
+                totalChunks={chunks.length}
+              />
+            </TabsContent>
 
-              <TabsContent value="codebase" className="h-full m-0 data-[state=inactive]:hidden">
-                <CodebaseExporterView />
-              </TabsContent>
-            </div>
+            {/* Tab 4: Raw vs Cleaned Documents */}
+            <TabsContent value="source_docs" className="mt-4">
+              <DocumentViewer
+                documents={documents}
+                activeDocumentId={activeDocumentId}
+                onSelectDocument={setActiveDocumentId}
+                onRemoveDocument={handleRemoveDocument}
+              />
+            </TabsContent>
           </Tabs>
         </div>
-      </div>
+      </main>
 
-      {/* Settings Modal */}
-      <SettingsDialog
-        open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-        currentModel={currentModel}
-        onUpdateModelConfig={handleUpdateModelConfig}
-        endpointConfig={endpointConfig}
-        onUpdateEndpointConfig={setEndpointConfig}
+      {/* Export Vector Dataset Modal */}
+      <ExportDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        chunks={chunks}
       />
 
       {/* Floating Made with Dyad Badge */}
