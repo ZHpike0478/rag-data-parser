@@ -7,7 +7,10 @@ import {
   Plus,
   FileCode,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Globe,
+  Link2,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileParser } from '@/services/fileParser';
+import { UrlParser } from '@/services/urlParser';
 import { RagPreprocessor, DEFAULT_PREPROCESSING_CONFIG } from '@/services/preprocessor';
 import { RagChunker } from '@/services/chunker';
 import { SAMPLE_DOCUMENTS, SampleDocDef } from '@/services/sampleDocuments';
@@ -26,6 +30,24 @@ interface FileUploadZoneProps {
   onAddMultipleDocuments: (docs: RagDocument[]) => void;
 }
 
+const SAMPLE_URLS = [
+  {
+    name: 'Wikipedia: Retrieval-Augmented Generation',
+    url: 'https://en.wikipedia.org/wiki/Retrieval-augmented_generation',
+    desc: 'Foundational concepts, dense vs sparse models, and architectures'
+  },
+  {
+    name: 'LangChain GitHub Readme',
+    url: 'https://raw.githubusercontent.com/langchain-ai/langchain/master/README.md',
+    desc: 'Production framework documentation & vector components'
+  },
+  {
+    name: 'W3C Web Standards Summary',
+    url: 'https://www.w3.org/standards/',
+    desc: 'HTML5, accessibility & architectural principles'
+  }
+];
+
 export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   onAddDocument,
   onAddMultipleDocuments
@@ -34,6 +56,10 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentProcessingFile, setCurrentProcessingFile] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // URL parser state
+  const [inputUrl, setInputUrl] = useState('');
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
 
   // Manual paste state
   const [manualTitle, setManualTitle] = useState('');
@@ -116,6 +142,51 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     toast.success(`Loaded sample: ${sample.name}`);
   };
 
+  const handleFetchUrl = async (targetUrl?: string) => {
+    const urlToFetch = (targetUrl || inputUrl).trim();
+    if (!urlToFetch) {
+      toast.error('Please enter a web URL to parse');
+      return;
+    }
+
+    setIsFetchingUrl(true);
+    try {
+      const parsed = await UrlParser.parseUrl(urlToFetch);
+      const cleaned = RagPreprocessor.cleanText(parsed.content, DEFAULT_PREPROCESSING_CONFIG);
+
+      const filename = parsed.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40) + '.md';
+
+      const newDoc: RagDocument = {
+        id: `doc_web_${Date.now()}`,
+        name: filename,
+        type: 'markdown',
+        extension: 'md',
+        size: new Blob([parsed.content]).size,
+        rawContent: parsed.content,
+        cleanedContent: cleaned,
+        metadata: {
+          ...parsed.metadata,
+          sourceUrl: parsed.url,
+          domain: parsed.domain,
+          title: parsed.title,
+          description: parsed.description,
+          charCount: parsed.content.length,
+          wordCount: parsed.content.split(/\s+/).filter(Boolean).length,
+          estimatedTokens: RagChunker.estimateTokenCount(cleaned)
+        },
+        createdAt: Date.now()
+      };
+
+      onAddDocument(newDoc);
+      setInputUrl('');
+      toast.success(`Successfully parsed URL: ${parsed.title}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to fetch and parse URL');
+    } finally {
+      setIsFetchingUrl(false);
+    }
+  };
+
   const handleManualSubmit = () => {
     if (!manualText.trim()) {
       toast.error('Please enter content before adding');
@@ -164,6 +235,13 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
               Upload Files
             </TabsTrigger>
             <TabsTrigger 
+              value="url" 
+              className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
+            >
+              <Globe className="w-3.5 h-3.5 mr-1.5" />
+              Web / URL Scraper
+            </TabsTrigger>
+            <TabsTrigger 
               value="paste" 
               className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium"
             >
@@ -174,7 +252,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
           <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-            Supports PDF, DOCX, MD, CSV, JSON, Code, SRT
+            Supports PDF, DOCX, MD, CSV, JSON, URLs, Code
           </span>
         </div>
 
@@ -275,7 +353,82 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           </div>
         </TabsContent>
 
-        {/* Tab 2: Manual Paste */}
+        {/* Tab 2: URL Scraper & Webpage Ingestion */}
+        <TabsContent value="url" className="mt-0 space-y-4">
+          <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-200 flex items-center gap-2 mb-1">
+                <Link2 className="w-4 h-4 text-cyan-400" />
+                Web Page / Documentation URL
+              </label>
+              <p className="text-xs text-slate-400">
+                Extracts articles, guides, and docs into clean Markdown, automatically stripping ads, navigation bars, and cookie banners.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                placeholder="https://en.wikipedia.org/wiki/Retrieval-augmented_generation"
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isFetchingUrl) {
+                    handleFetchUrl();
+                  }
+                }}
+                className="bg-slate-950 border-slate-800 text-xs h-10 font-mono text-cyan-200 flex-1"
+              />
+
+              <Button
+                onClick={() => handleFetchUrl()}
+                disabled={isFetchingUrl}
+                className="bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold text-xs h-10 px-5 shrink-0"
+              >
+                {isFetchingUrl ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                    Fetching & Cleaning...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3.5 h-3.5 mr-2" />
+                    Ingest &amp; Structure URL
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Quick URL presets */}
+            <div className="pt-2 border-t border-slate-800/60">
+              <span className="text-[11px] text-slate-400 block mb-2 font-medium">
+                Try a pre-tested public URL:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {SAMPLE_URLS.map((sampleUrl, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setInputUrl(sampleUrl.url);
+                      handleFetchUrl(sampleUrl.url);
+                    }}
+                    disabled={isFetchingUrl}
+                    className="p-2.5 rounded-lg bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/50 text-left transition-all group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-200 group-hover:text-cyan-300">
+                      <span className="truncate">{sampleUrl.name}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 shrink-0 ml-1" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {sampleUrl.desc}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Tab 3: Manual Paste */}
         <TabsContent value="paste" className="mt-0 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">

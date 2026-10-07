@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   FileText,
-  Trash2
+  Trash2,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +89,20 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               <>
                 <span>•</span>
                 <span className="text-cyan-400 font-medium">{activeDoc.pages.length} Pages</span>
+              </>
+            )}
+            {activeDoc.metadata.sourceUrl && (
+              <>
+                <span>•</span>
+                <a
+                  href={activeDoc.metadata.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1 underline underline-offset-2"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  View Original Web Source
+                </a>
               </>
             )}
           </div>
