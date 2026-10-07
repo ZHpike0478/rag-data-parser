@@ -1,15 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { 
-  Upload, 
-  FileText, 
-  Sparkles, 
-  Code2, 
-  Table, 
-  BookOpen, 
-  Plus, 
-  FileCode, 
-  FileType, 
-  CheckCircle2,
+import {
+  Upload,
+  FileText,
+  Sparkles,
+  BookOpen,
+  Plus,
+  FileCode,
   Loader2,
   FileSpreadsheet
 } from 'lucide-react';

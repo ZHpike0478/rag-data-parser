@@ -1,14 +1,11 @@
 import React from 'react';
-import { 
-  Database, 
-  Sparkles, 
-  Download, 
-  Trash2, 
-  Layers, 
-  FileText, 
-  Hash, 
-  Coins,
-  Cpu
+import {
+  Database,
+  Download,
+  Trash2,
+  Layers,
+  FileText,
+  Hash
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

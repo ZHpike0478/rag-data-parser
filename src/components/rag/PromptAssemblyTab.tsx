@@ -1,20 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Bot, 
-  Copy, 
-  Check, 
-  Sparkles, 
-  FileCode, 
-  Cpu, 
-  Layers, 
-  HelpCircle,
-  ShieldAlert,
-  Send
+import {
+  Bot,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { RagChunk } from '@/types/rag';
 import { RetrievalSimulator } from '@/services/retrievalSimulator';
 import { RagChunker } from '@/services/chunker';

@@ -1,13 +1,11 @@
 import React from 'react';
-import { 
-  Sliders, 
-  Layers, 
-  Scissors, 
-  ShieldCheck, 
-  Sparkles, 
+import {
+  Sliders,
+  Layers,
+  Scissors,
+  ShieldCheck,
+  Sparkles,
   HelpCircle,
-  FileCode,
-  Tag,
   Wand2,
   RefreshCw
 } from 'lucide-react';

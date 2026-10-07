@@ -1,17 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Search, 
-  Layers, 
-  Copy, 
-  Check, 
-  ExternalLink, 
-  Tag, 
-  Hash, 
-  FileText, 
-  ArrowRight, 
-  SlidersHorizontal,
-  Eye,
-  Code2,
+import {
+  Search,
+  Layers,
+  Copy,
+  Check,
+  Tag,
   Sparkles
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';

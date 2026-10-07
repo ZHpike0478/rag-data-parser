@@ -1,23 +1,15 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { 
-  Database, 
-  Layers, 
-  Sliders, 
-  Target, 
-  FileText, 
-  Sparkles, 
-  Download, 
-  RefreshCw,
-  Plus,
-  Zap,
-  Info,
+import {
+  Layers,
+  Sliders,
+  Target,
+  FileText,
   BarChart3,
   Compass,
   Bot
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { RagHeader } from '@/components/rag/RagHeader';
 import { FileUploadZone } from '@/components/rag/FileUploadZone';
 import { ChunkingControls } from '@/components/rag/ChunkingControls';

@@ -1,20 +1,17 @@
 import React, { useState } from 'react';
-import { 
-  Download, 
-  Copy, 
-  Check, 
-  FileArchive, 
-  Code2, 
-  Database, 
-  FileText, 
-  Sparkles,
-  Layers
+import {
+  Download,
+  Copy,
+  Check,
+  FileArchive,
+  Database,
+  Sparkles
 } from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';

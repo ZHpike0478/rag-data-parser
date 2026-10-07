@@ -2,9 +2,15 @@ import * as pdfjsLib from 'pdfjs-dist';
 import JSZip from 'jszip';
 import { SupportedFileType, DocumentPage } from '../types/rag';
 
-// Configure PDF.js worker
+// Configure PDF.js worker safely
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  try {
+    if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '4.10.38'}/build/pdf.worker.min.mjs`;
+    }
+  } catch (err) {
+    console.warn('PDF worker config note:', err);
+  }
 }
 
 export interface ParseResult {

@@ -1,17 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Target, 
-  Search, 
-  Sparkles, 
-  Layers, 
-  Info, 
-  Eye, 
-  Compass,
-  Zap
+import {
+  Search,
+  Eye,
+  Compass
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { RagChunk, RagDocument } from '@/types/rag';
 import { RetrievalSimulator } from '@/services/retrievalSimulator';
 

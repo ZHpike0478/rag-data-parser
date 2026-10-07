@@ -473,17 +473,17 @@ export class RagChunker {
 
       currentOffset = actualStart + chunkText.length;
 
-      // Rewind for overlap
+      // Rewind for overlap, guaranteeing strict forward progress
       if (i < words.length) {
         let rewind = 0;
         let rewindWords = 0;
-        while (i - rewind > startWordIndex && rewindWords < overlapWordCount) {
+        while (i - rewind > startWordIndex + 1 && rewindWords < overlapWordCount) {
           rewind++;
           if (!/^\s+$/.test(words[i - rewind])) {
             rewindWords++;
           }
         }
-        i = i - rewind;
+        i = Math.max(startWordIndex + 1, i - rewind);
       }
     }
 

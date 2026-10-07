@@ -1,20 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  FileText, 
-  Trash2, 
-  CheckCircle2, 
-  Clock, 
-  Cpu, 
-  Hash, 
-  Sparkles,
-  ArrowRightLeft,
-  FileSpreadsheet,
-  FileCode,
-  BookOpen
+import {
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RagDocument } from '@/types/rag';
 
 interface DocumentViewerProps {

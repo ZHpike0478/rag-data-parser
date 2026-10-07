@@ -1,18 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Search, 
-  Sparkles, 
-  Cpu, 
-  HelpCircle, 
-  CheckCircle, 
-  Zap, 
-  Layers, 
-  ExternalLink,
-  Target,
-  ArrowRight
+import {
+  Search,
+  Sparkles,
+  Cpu,
+  CheckCircle,
+  Zap,
+  Target
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { RetrievalSimulator } from '@/services/retrievalSimulator';

@@ -1,24 +1,20 @@
 import React, { useMemo } from 'react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell,
-  PieChart,
-  Pie
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
 } from 'recharts';
 import { 
-  Hash, 
-  Coins, 
-  Layers, 
-  BarChart3, 
-  Scale, 
-  TrendingUp, 
-  CheckCircle, 
-  AlertTriangle 
+  Hash,
+  Coins,
+  Layers,
+  BarChart3,
+  Scale,
+  TrendingUp
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RagChunk, RagDocument } from '@/types/rag';
