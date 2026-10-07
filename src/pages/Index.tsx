@@ -10,7 +10,10 @@ import {
   RefreshCw,
   Plus,
   Zap,
-  Info
+  Info,
+  BarChart3,
+  Compass,
+  Bot
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +24,9 @@ import { ChunkingControls } from '@/components/rag/ChunkingControls';
 import { ChunkVisualizer } from '@/components/rag/ChunkVisualizer';
 import { DocumentViewer } from '@/components/rag/DocumentViewer';
 import { RetrievalSimulatorTab } from '@/components/rag/RetrievalSimulatorTab';
+import { TokenAnalytics } from '@/components/rag/TokenAnalytics';
+import { VectorSpaceMap } from '@/components/rag/VectorSpaceMap';
+import { PromptAssemblyTab } from '@/components/rag/PromptAssemblyTab';
 import { ExportDialog } from '@/components/rag/ExportDialog';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import { 
@@ -146,30 +152,54 @@ const Index: React.FC = () => {
         {/* Primary Workspace Navigation Tabs */}
         <div className="space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2">
-              <TabsList className="bg-slate-900/90 border border-slate-800 p-1 rounded-xl h-10">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-800 pb-2">
+              <TabsList className="bg-slate-900/90 border border-slate-800 p-1 rounded-xl h-auto flex flex-wrap gap-1">
                 <TabsTrigger 
                   value="chunks" 
-                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
                 >
                   <Layers className="w-3.5 h-3.5" />
                   <span>Chunk Inspector</span>
-                  <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-1 bg-slate-800 text-slate-300">
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-0.5 bg-slate-800 text-slate-300">
                     {chunks.length}
                   </Badge>
                 </TabsTrigger>
 
                 <TabsTrigger 
                   value="simulator" 
-                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
                 >
                   <Target className="w-3.5 h-3.5" />
                   <span>Retrieval Sandbox</span>
                 </TabsTrigger>
 
                 <TabsTrigger 
+                  value="vectormap" 
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>2D Vector Space</span>
+                </TabsTrigger>
+
+                <TabsTrigger 
+                  value="analytics" 
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Token Analytics</span>
+                </TabsTrigger>
+
+                <TabsTrigger 
+                  value="prompts" 
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Prompt Assembly</span>
+                </TabsTrigger>
+
+                <TabsTrigger 
                   value="pipeline" 
-                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
                 >
                   <Sliders className="w-3.5 h-3.5" />
                   <span>Chunking Config</span>
@@ -177,18 +207,18 @@ const Index: React.FC = () => {
 
                 <TabsTrigger 
                   value="source_docs" 
-                  className="text-xs px-3.5 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
+                  className="text-xs px-3 py-1.5 data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950 font-medium gap-1.5"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Documents & Cleaning</span>
-                  <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-1 bg-slate-800 text-slate-300">
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1 ml-0.5 bg-slate-800 text-slate-300">
                     {documents.length}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
 
               {/* Status information pill */}
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+              <div className="hidden xl:flex items-center gap-2 text-xs font-mono text-slate-400">
                 <span className="text-cyan-400 font-semibold">{chunkConfig.strategy.replace('_', ' ')}</span>
                 <span>•</span>
                 <span>{chunkConfig.chunkSize} chars</span>
@@ -212,7 +242,28 @@ const Index: React.FC = () => {
               <RetrievalSimulatorTab chunks={chunks} />
             </TabsContent>
 
-            {/* Tab 3: Chunking & Preprocessing Pipeline Controls */}
+            {/* Tab 3: 2D Vector Embedding Space Map */}
+            <TabsContent value="vectormap" className="mt-4">
+              <VectorSpaceMap
+                chunks={chunks}
+                documents={documents}
+              />
+            </TabsContent>
+
+            {/* Tab 4: Token Analytics & Histograms */}
+            <TabsContent value="analytics" className="mt-4">
+              <TokenAnalytics
+                chunks={chunks}
+                documents={documents}
+              />
+            </TabsContent>
+
+            {/* Tab 5: Prompt Assembly & Context Synthesizer */}
+            <TabsContent value="prompts" className="mt-4">
+              <PromptAssemblyTab chunks={chunks} />
+            </TabsContent>
+
+            {/* Tab 6: Chunking & Preprocessing Pipeline Controls */}
             <TabsContent value="pipeline" className="mt-4">
               <ChunkingControls
                 chunkConfig={chunkConfig}
@@ -224,7 +275,7 @@ const Index: React.FC = () => {
               />
             </TabsContent>
 
-            {/* Tab 4: Raw vs Cleaned Documents */}
+            {/* Tab 7: Raw vs Cleaned Documents */}
             <TabsContent value="source_docs" className="mt-4">
               <DocumentViewer
                 documents={documents}
